@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Poker GTO Trainer — Offline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080f0a;font-family:'Lato',sans-serif;color:#f0ead6;min-height:100vh}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:rgba(0,0,0,.15)}
+::-webkit-scrollbar-thumb{background:rgba(201,168,76,.3);border-radius:2px}
+button:hover:not(:disabled){filter:brightness(1.15)}
+button:active:not(:disabled){transform:scale(.97)}
+.anim{animation:pop .2s ease}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════
+const RANKS=["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+const SUIT_SYM={h:"♥",d:"♦",c:"♣",s:"♠"};
+const GRADE_COL={"A+":"#4caf7d",A:"#4caf7d","B+":"#8bc34a",B:"#8bc34a","C+":"#c9a84c",C:"#c9a84c",D:"#f97316",F:"#e74c3c"};
+
+function handStr(r,c){if(r===c)return RANKS[r]+RANKS[r];if(r<c)return RANKS[r]+RANKS[c]+"s";return RANKS[c]+RANKS[r]+"o";}
+function combos(h){return h.length===2?6:h.endsWith("s")?4:12;}
+
+function rfiColor(f){
+  if(!f||f<=0)return"#0d1a10";if(f>=90)return"#14532d";if(f>=70)return"#166634";
+  if(f>=50)return"#365314";if(f>=30)return"#713f12";if(f>=10)return"#7c2d12";return"#3d1a0a";
+}
+function bbColor(c,r){
+  c=c||0;r=r||0;
+  if(r>=70)return"#14532d";if(r>=35)return"#1a6340";if(r>=10)return"#1c5245";
+  if(c>=70)return"#1e3a6e";if(c>=40)return"#1e3058";if(c>=10)return"#1a2748";return"#0d1a10";
+}
+
+const RFI={
+  UTG:{AA:100,KK:100,QQ:100,JJ:100,TT:100,"99":100,"88":100,"77":80,"66":50,"55":25,AKs:100,AQs:100,AJs:100,ATs:100,A9s:80,A8s:55,A7s:35,A5s:75,A4s:45,A3s:20,A2s:15,KQs:100,KJs:100,KTs:85,K9s:50,K8s:20,QJs:100,QTs:100,Q9s:50,JTs:100,J9s:70,J8s:20,T9s:95,T8s:40,"98s":70,"97s":15,"87s":45,"76s":20,AKo:100,AQo:100,AJo:100,ATo:65,A9o:10,KQo:100,KJo:65,KTo:15,QJo:40,JTo:15},
+  HJ:{AA:100,KK:100,QQ:100,JJ:100,TT:100,"99":100,"88":100,"77":100,"66":75,"55":55,"44":20,AKs:100,AQs:100,AJs:100,ATs:100,A9s:100,A8s:80,A7s:60,A6s:45,A5s:90,A4s:70,A3s:45,A2s:40,KQs:100,KJs:100,KTs:100,K9s:70,K8s:40,K7s:15,QJs:100,QTs:100,Q9s:75,Q8s:25,JTs:100,J9s:90,J8s:40,J7s:10,T9s:100,T8s:65,T7s:25,"98s":90,"97s":45,"96s":10,"87s":70,"86s":20,"76s":50,"75s":10,"65s":30,"54s":15,AKo:100,AQo:100,AJo:100,ATo:85,A9o:30,A8o:5,KQo:100,KJo:85,KTo:40,K9o:5,QJo:70,QTo:20,JTo:40,J9o:5,T9o:10},
+  CO:{AA:100,KK:100,QQ:100,JJ:100,TT:100,"99":100,"88":100,"77":100,"66":100,"55":85,"44":60,"33":30,"22":15,AKs:100,AQs:100,AJs:100,ATs:100,A9s:100,A8s:100,A7s:85,A6s:75,A5s:100,A4s:90,A3s:70,A2s:65,KQs:100,KJs:100,KTs:100,K9s:90,K8s:65,K7s:40,K6s:20,K5s:10,QJs:100,QTs:100,Q9s:90,Q8s:55,Q7s:25,JTs:100,J9s:100,J8s:65,J7s:30,J6s:5,T9s:100,T8s:90,T7s:45,T6s:15,"98s":100,"97s":70,"96s":30,"95s":5,"87s":90,"86s":45,"85s":15,"76s":80,"75s":30,"65s":65,"64s":20,"54s":50,"53s":10,"43s":20,AKo:100,AQo:100,AJo:100,ATo:100,A9o:65,A8o:25,A7o:5,KQo:100,KJo:100,KTo:70,K9o:25,K8o:5,QJo:90,QTo:50,Q9o:15,JTo:70,J9o:25,J8o:5,T9o:40,T8o:5,"98o":15,"87o":5},
+  BTN:{AA:100,KK:100,QQ:100,JJ:100,TT:100,"99":100,"88":100,"77":100,"66":100,"55":100,"44":100,"33":100,"22":100,AKs:100,AQs:100,AJs:100,ATs:100,A9s:100,A8s:100,A7s:100,A6s:100,A5s:100,A4s:100,A3s:100,A2s:100,KQs:100,KJs:100,KTs:100,K9s:100,K8s:100,K7s:85,K6s:70,K5s:55,K4s:40,K3s:30,K2s:20,QJs:100,QTs:100,Q9s:100,Q8s:85,Q7s:65,Q6s:45,Q5s:25,Q4s:10,JTs:100,J9s:100,J8s:90,J7s:65,J6s:40,J5s:15,T9s:100,T8s:100,T7s:80,T6s:50,T5s:20,"98s":100,"97s":90,"96s":65,"95s":30,"87s":100,"86s":80,"85s":50,"84s":20,"76s":95,"75s":65,"74s":35,"65s":85,"64s":50,"54s":80,"53s":40,"43s":55,"42s":20,"32s":30,AKo:100,AQo:100,AJo:100,ATo:100,A9o:90,A8o:70,A7o:50,A6o:30,A5o:20,A4o:10,A3o:5,KQo:100,KJo:100,KTo:90,K9o:65,K8o:35,K7o:15,K6o:5,QJo:100,QTo:85,Q9o:55,Q8o:25,JTo:90,J9o:65,J8o:30,J7o:10,T9o:75,T8o:45,T7o:15,"98o":50,"97o":25,"87o":30,"86o":10,"76o":15,"65o":10},
+  SB:{AA:100,KK:100,QQ:100,JJ:100,TT:100,"99":100,"88":100,"77":100,"66":100,"55":95,"44":85,"33":65,"22":50,AKs:100,AQs:100,AJs:100,ATs:100,A9s:100,A8s:100,A7s:100,A6s:95,A5s:100,A4s:100,A3s:90,A2s:85,KQs:100,KJs:100,KTs:100,K9s:100,K8s:90,K7s:75,K6s:60,K5s:45,K4s:30,K3s:20,K2s:15,QJs:100,QTs:100,Q9s:100,Q8s:80,Q7s:60,Q6s:40,Q5s:20,JTs:100,J9s:100,J8s:85,J7s:60,J6s:35,T9s:100,T8s:95,T7s:70,T6s:45,"98s":100,"97s":80,"96s":55,"87s":95,"86s":65,"85s":35,"76s":85,"75s":55,"65s":75,"64s":40,"54s":70,"53s":35,"43s":45,"32s":25,AKo:100,AQo:100,AJo:100,ATo:100,A9o:80,A8o:55,A7o:35,A6o:20,KQo:100,KJo:100,KTo:85,K9o:55,K8o:25,QJo:95,QTo:70,Q9o:45,JTo:85,J9o:55,J8o:25,T9o:65,T8o:35,"98o":45,"87o":25,"76o":15},
+};
+
+const BB_DEF={
+  "vs BTN":{AA:{c:0,r:100},KK:{c:0,r:100},QQ:{c:10,r:90},JJ:{c:20,r:80},TT:{c:30,r:70},"99":{c:40,r:60},"88":{c:55,r:45},"77":{c:65,r:30},"66":{c:70,r:20},"55":{c:80,r:10},"44":{c:80,r:5},"33":{c:70,r:0},"22":{c:65,r:0},AKs:{c:20,r:80},AQs:{c:30,r:70},AJs:{c:50,r:50},ATs:{c:60,r:40},A9s:{c:70,r:20},A8s:{c:75,r:15},A7s:{c:70,r:10},A6s:{c:65,r:10},A5s:{c:60,r:30},A4s:{c:60,r:20},A3s:{c:55,r:15},A2s:{c:55,r:10},KQs:{c:40,r:60},KJs:{c:55,r:45},KTs:{c:65,r:35},K9s:{c:70,r:20},K8s:{c:70,r:10},K7s:{c:65,r:5},K6s:{c:60,r:5},K5s:{c:55,r:5},K4s:{c:50,r:0},K3s:{c:45,r:0},K2s:{c:40,r:0},QJs:{c:65,r:35},QTs:{c:70,r:25},Q9s:{c:75,r:15},Q8s:{c:70,r:5},Q7s:{c:60,r:0},Q6s:{c:55,r:0},Q5s:{c:45,r:0},Q4s:{c:35,r:0},JTs:{c:70,r:30},J9s:{c:75,r:20},J8s:{c:70,r:10},J7s:{c:60,r:0},T9s:{c:75,r:20},T8s:{c:75,r:10},T7s:{c:65,r:0},"98s":{c:80,r:15},"97s":{c:70,r:5},"96s":{c:60,r:0},"87s":{c:75,r:10},"86s":{c:65,r:0},"85s":{c:50,r:0},"76s":{c:70,r:5},"75s":{c:60,r:0},"65s":{c:65,r:0},"54s":{c:60,r:0},"43s":{c:45,r:0},"32s":{c:30,r:0},AKo:{c:30,r:70},AQo:{c:40,r:60},AJo:{c:55,r:45},ATo:{c:65,r:35},A9o:{c:70,r:20},A8o:{c:65,r:10},A7o:{c:60,r:5},KQo:{c:55,r:45},KJo:{c:65,r:35},KTo:{c:70,r:20},K9o:{c:65,r:5},K8o:{c:55,r:0},QJo:{c:70,r:20},QTo:{c:70,r:10},Q9o:{c:65,r:0},JTo:{c:70,r:15},J9o:{c:65,r:5},J8o:{c:55,r:0},T9o:{c:70,r:5},T8o:{c:60,r:0},"98o":{c:60,r:0},"87o":{c:55,r:0},"76o":{c:50,r:0}},
+  "vs CO":{AA:{c:0,r:100},KK:{c:0,r:100},QQ:{c:15,r:85},JJ:{c:25,r:75},TT:{c:35,r:65},"99":{c:50,r:50},"88":{c:60,r:40},"77":{c:65,r:30},"66":{c:70,r:20},"55":{c:75,r:10},"44":{c:70,r:0},"33":{c:60,r:0},"22":{c:55,r:0},AKs:{c:20,r:80},AQs:{c:35,r:65},AJs:{c:50,r:50},ATs:{c:60,r:40},A9s:{c:70,r:15},A8s:{c:70,r:10},A5s:{c:55,r:30},KQs:{c:45,r:55},KJs:{c:60,r:40},KTs:{c:65,r:30},K9s:{c:65,r:15},QJs:{c:65,r:30},QTs:{c:70,r:20},Q9s:{c:70,r:10},JTs:{c:70,r:25},J9s:{c:75,r:15},T9s:{c:75,r:15},T8s:{c:70,r:5},"98s":{c:75,r:10},"87s":{c:70,r:5},"76s":{c:65,r:0},"65s":{c:60,r:0},AKo:{c:30,r:70},AQo:{c:45,r:55},AJo:{c:55,r:45},ATo:{c:65,r:30},A9o:{c:65,r:15},KQo:{c:55,r:40},KJo:{c:65,r:30},KTo:{c:70,r:15},QJo:{c:70,r:15},QTo:{c:65,r:5},JTo:{c:70,r:10},T9o:{c:65,r:0}},
+};
+
+// ═══════════════════════════════════════════════════
+//  SCENARIOS BANK (offline, hardcoded)
+// ═══════════════════════════════════════════════════
+const SCENARIOS=[
+  // PREFLOP OPENS
+  {street:"preflop",pos:"BTN",vpos:"BB",cards:["Ah","Kd"],board:[],pot:1.5,stack:100,toCall:0,
+   situation:"Todos foldearon hasta vos en BTN. Solo quedan BB y vos.",
+   actions:["Fold","Raise 2.5BB","Raise 3BB"],
+   correct:"Raise",grade:{Fold:"F","Raise 2.5BB":"A","Raise 3BB":"A"},
+   freqs:{"Fold":0,"Raise 2.5BB":65,"Raise 3BB":35},
+   explanation:"AKo en BTN es apertura obligatoria al 100%. Preferís 2.5BB en BTN por posición.",
+   insight:"Manos premium siempre abren en cualquier posición. En BTN el sizing puede ser más chico."},
+
+  {street:"preflop",pos:"UTG",vpos:"BB",cards:["7c","2h"],board:[],pot:1.5,stack:100,toCall:0,
+   situation:"Primera posición (UTG), 5 jugadores detrás.",
+   actions:["Fold","Raise 3BB"],
+   correct:"Fold",grade:{Fold:"A","Raise 3BB":"F"},
+   freqs:{"Fold":100,"Raise 3BB":0},
+   explanation:"72o es la peor mano del Hold'em. Fold absoluto desde cualquier posición.",
+   insight:"UTG requiere el rango más fuerte (~15%). Solo manos que juegan bien desde posición early."},
+
+  {street:"preflop",pos:"CO",vpos:"BB",cards:["As","5s"],board:[],pot:1.5,stack:100,toCall:0,
+   situation:"Foldearon UTG y HJ. Sos el CO.",
+   actions:["Fold","Raise 2.5BB","Raise 3BB"],
+   correct:"Raise",grade:{Fold:"D","Raise 2.5BB":"A","Raise 3BB":"B"},
+   freqs:{"Fold":0,"Raise 2.5BB":80,"Raise 3BB":20},
+   explanation:"A5s es apertura al 100% desde CO. Tiene bloqueador de Ace y muy buena playability postflop.",
+   insight:"Ax suited tienen flush draw potencial + blockers. A5s especialmente por la rueda (A2345)."},
+
+  {street:"preflop",pos:"UTG",vpos:"BB",cards:["Jc","Th"],board:[],pot:1.5,stack:100,toCall:0,
+   situation:"Sos UTG en mesa de 6 jugadores.",
+   actions:["Fold","Raise 3BB"],
+   correct:"Raise",grade:{Fold:"C","Raise 3BB":"A"},
+   freqs:{"Fold":15,"Raise 3BB":85},
+   explanation:"JTo está en el límite del rango UTG. La mayoría de solvers lo incluyen aunque sea marginal.",
+   insight:"JTo conecta bien con tableros medios y tiene dos cartas altas. Justo en el límite UTG."},
+
+  {street:"preflop",pos:"SB",vpos:"BB",cards:["Kh","7d"],board:[],pot:1.5,stack:100,toCall:0.5,
+   situation:"Todos foldearon. SB vs BB, te cuesta 0.5BB completar.",
+   actions:["Fold","Call","Raise 3BB"],
+   correct:"Raise",grade:{Fold:"D",Call:"C","Raise 3BB":"A"},
+   freqs:{"Fold":5,Call:20,"Raise 3BB":75},
+   explanation:"K7o desde SB conviene abrir con raise. Completar es subóptimo porque BB se queda en posición.",
+   insight:"En SB vs BB preferís raise o fold. Completar deja a BB en posición con precio muy bueno."},
+
+  // 3-BET SPOTS
+  {street:"preflop",pos:"BB",vpos:"BTN",cards:["Ac","5c"],board:[],pot:4,stack:97,toCall:2.5,
+   situation:"BTN abre a 2.5BB. SB foldea. Vos en BB con A5s.",
+   actions:["Fold","Call","3-bet 8BB","3-bet 10BB"],
+   correct:"3-bet",grade:{Fold:"D",Call:"C","3-bet 8BB":"A","3-bet 10BB":"A"},
+   freqs:{"Fold":5,Call:35,"3-bet 8BB":40,"3-bet 10BB":20},
+   explanation:"A5s es un 3-bet semi-bluff perfecto vs BTN: tiene bloqueador de Ace + equity cuando es llamado.",
+   insight:"Ax suited bajos son 3-bets ideales: bloquean AA/AK del oponente y tienen valor cuando entran."},
+
+  {street:"preflop",pos:"BB",vpos:"BTN",cards:["Kd","Qc"],board:[],pot:4,stack:97,toCall:2.5,
+   situation:"BTN abre a 2.5BB. Vos en BB con KQo.",
+   actions:["Fold","Call","3-bet 9BB"],
+   correct:"3-bet",grade:{Fold:"D",Call:"B","3-bet 9BB":"A"},
+   freqs:{"Fold":0,Call:35,"3-bet 9BB":65},
+   explanation:"KQo vs BTN es 3-bet/call frecuente. Tiene demasiado valor como para solo llamar.",
+   insight:"KQo bloquea KK, QQ, KQ del villain. Buen 3-bet de valor thin vs la apertura amplia del BTN."},
+
+  {street:"preflop",pos:"UTG",vpos:"BB",cards:["Ah","Ad"],board:[],pot:4,stack:97,toCall:0,
+   situation:"Abriste 3BB desde UTG. BB sube a 9BB. Acción de vuelta a vos.",
+   actions:["Fold","Call","4-bet 24BB","4-bet 28BB"],
+   correct:"4-bet",grade:{Fold:"F",Call:"B","4-bet 24BB":"A","4-bet 28BB":"A"},
+   freqs:{"Fold":0,Call:20,"4-bet 24BB":55,"4-bet 28BB":25},
+   explanation:"AA siempre 4-bet. Aunque a veces se llanea para no desbalancear el rango, lo principal es extraer valor.",
+   insight:"Con AA querés meter dinero. El call puede ser válido para mantener al villain en el pote, pero 4-bet es más común."},
+
+  // POSTFLOP - FLOP
+  {street:"flop",pos:"BTN",vpos:"BB",cards:["Ah","Kd"],board:["As","7c","2h"],pot:6,stack:94,toCall:0,
+   situation:"Abriste BTN, BB llamó. BB checkea el flop seco As-7c-2h.",
+   actions:["Check","Bet 2BB","Bet 4BB","Bet 6BB"],
+   correct:"Bet",grade:{Check:"C","Bet 2BB":"A","Bet 4BB":"A","Bet 6BB":"B"},
+   freqs:{Check:30,"Bet 2BB":35,"Bet 4BB":40,"Bet 6BB":25},
+   explanation:"Tablero seco donde lideraste el rango. Bet pequeño con casi toda tu frecuencia: valor y bluff.",
+   insight:"En tableros As-high secos tu rango tiene gran ventaja. Apuestas pequeñas frecuentes son óptimas."},
+
+  {street:"flop",pos:"BB",vpos:"BTN",cards:["8h","7h"],board:["Jd","6c","2s"],pot:6,stack:94,toCall:3,
+   situation:"BTN apuesta 3BB en J62 rainbow. Vos en BB con 87h (gutshot).",
+   actions:["Fold","Call","Raise 9BB"],
+   correct:"Call",grade:{Fold:"C",Call:"A","Raise 9BB":"C"},
+   freqs:{Fold:30,Call:60,"Raise 9BB":10},
+   explanation:"87h tiene gutshot a 9 y dos overcards. Precio justo para llamar y ver el turn.",
+   insight:"Con gutshot + backdoor draws tenés suficiente equity para llamar. No hay razón para fold con esta mano."},
+
+  {street:"flop",pos:"BB",vpos:"BTN",cards:["Qh","Qd"],board:["Qs","8c","3h"],pot:6,stack:94,toCall:3,
+   situation:"BTN apuesta 3BB. Vos en BB con trips (QQ en tablero Q83).",
+   actions:["Fold","Call","Raise 10BB"],
+   correct:"Call",grade:{Fold:"F",Call:"A","Raise 10BB":"B"},
+   freqs:{Fold:0,Call:70,"Raise 10BB":30},
+   explanation:"Con trips preferís slowplay para dejar que BTN siga apostando. Raise puede cerrar el pote demasiado pronto.",
+   insight:"Manos muy fuertes a veces llaman para mantener el rango del oponente más amplio y extraer más valor en calles futuras."},
+
+  {street:"flop",pos:"BTN",vpos:"BB",cards:["Kc","Qc"],board:["Jh","Th","4d"],pot:6,stack:94,toCall:0,
+   situation:"BB checkea en flop JT4 con dos corazones. Tenés KQ (straight draw).",
+   actions:["Check","Bet 3BB","Bet 5BB"],
+   correct:"Bet",grade:{Check:"B","Bet 3BB":"A","Bet 5BB":"A"},
+   freqs:{Check:25,"Bet 3BB":45,"Bet 5BB":30},
+   explanation:"KQ tiene nut straight draw a Ace. Con tanto equity apostás por valor y para protegerte de corazones.",
+   insight:"Semi-bluffs con draws fuertes deben apostarse para ganar el pote y tener equity cuando se llama."},
+
+  // TURN
+  {street:"turn",pos:"BTN",vpos:"BB",cards:["Ah","Jd"],board:["As","7c","2h","8d"],pot:12,stack:88,toCall:0,
+   situation:"Apostaste flop, BB llamó. BB checkea el turn 8d en A-7-2-8.",
+   actions:["Check","Bet 6BB","Bet 9BB"],
+   correct:"Bet",grade:{Check:"B","Bet 6BB":"A","Bet 9BB":"A"},
+   freqs:{Check:30,"Bet 6BB":35,"Bet 9BB":35},
+   explanation:"Top pair top kicker en tablero donde pocos draws llegaron. Seguís apostando para valor.",
+   insight:"TPTK en tableros secos debe apostar dos calles mínimo. BB puede tener A-x peor o pocket pairs."},
+
+  {street:"turn",pos:"BB",vpos:"BTN",cards:["9h","8h"],board:["7c","6d","2s","Th"],pot:14,stack:86,toCall:7,
+   situation:"BTN apuesta 7BB en turn. Tenés str8 (9-8 en 7-6-2-T).",
+   actions:["Fold","Call","Raise 22BB"],
+   correct:"Raise",grade:{Fold:"F",Call:"B","Raise 22BB":"A"},
+   freqs:{Fold:0,Call:30,"Raise 22BB":70},
+   explanation:"Tenés el straight hecho en tablero where BTN podría tener muchos draws. Hay que cobrar ahora.",
+   insight:"Manos fuertes en tableros con draws cobran en el turn para protegerse y maximizar valor."},
+
+  // RIVER
+  {street:"river",pos:"BTN",vpos:"BB",cards:["Ac","Kh"],board:["As","7c","2h","8d","Qd"],pot:26,stack:74,toCall:0,
+   situation:"BB checkea el river Q de diamantes. Tenés TPTK en tablero A-7-2-8-Q.",
+   actions:["Check","Bet 10BB","Bet 18BB"],
+   correct:"Bet",grade:{Check:"B","Bet 10BB":"A","Bet 18BB":"A"},
+   freqs:{Check:25,"Bet 10BB":40,"Bet 18BB":35},
+   explanation:"TPTK sigue siendo top pair top kicker en river. BB puede pagar con A-x peor o valor medio.",
+   insight:"En river con manos fuertes buscás el tamaño de apuesta que BB puede pagar. No dejes valor sobre la mesa."},
+
+  {street:"river",pos:"BB",vpos:"BTN",cards:["Kd","Jh"],board:["Kh","8c","3d","2s","7c"],pot:18,stack:82,toCall:9,
+   situation:"BTN apuesta 9BB en river K-8-3-2-7 rainbow. Tenés top pair KJ.",
+   actions:["Fold","Call","Raise 28BB"],
+   correct:"Call",grade:{Fold:"C",Call:"A","Raise 28BB":"C"},
+   freqs:{Fold:15,Call:75,"Raise 28BB":10},
+   explanation:"KJ es top pair con buen kicker pero no es hand de raise en river. Solo llamás para valor defensivo.",
+   insight:"En river con una mano de valor medio (top pair) preferís call sobre raise. El raise solo es llamado por manos mejores."},
+
+  // STEAL/BLIND DEFENSE
+  {street:"preflop",pos:"BB",vpos:"SB",cards:["Tc","8d"],board:[],pot:2,stack:98.5,toCall:0.5,
+   situation:"SB completa 0.5BB. Vos en BB con T8o.",
+   actions:["Check","Raise 3BB"],
+   correct:"Check",grade:{Check:"A","Raise 3BB":"B"},
+   freqs:{Check:70,"Raise 3BB":30},
+   explanation:"T8o en BB vs complete del SB. Checkear es frecuente. Raise es válido pero no obligatorio.",
+   insight:"Vs SB complete desde BB tenés buen precio para ver el flop con manos medias. No hay que forzar el raise."},
+
+  {street:"preflop",pos:"BB",vpos:"BTN",cards:["Js","Ts"],board:[],pot:4,stack:97,toCall:2.5,
+   situation:"BTN abre 2.5BB. SB foldea. Vos en BB con JTs.",
+   actions:["Fold","Call","3-bet 9BB"],
+   correct:"Call",grade:{Fold:"D",Call:"A","3-bet 9BB":"B"},
+   freqs:{Fold:0,Call:60,"3-bet 9BB":40},
+   explanation:"JTs es call o 3-bet desde BB. Conecta muy bien con tableros, tiene doble suited y straight potential.",
+   insight:"Manos conectadas suited se defienden siempre vs apertura BTN. La question es call o 3-bet, no fold."},
+
+  // TOUGH SPOTS
+  {street:"flop",pos:"BB",vpos:"BTN",cards:["Ad","Td"],board:["Kh","9c","3d"],pot:6,stack:94,toCall:4,
+   situation:"BTN apuesta grande 4BB en K93. Tenés A-T suited con backdoor flush draw.",
+   actions:["Fold","Call","Raise 12BB"],
+   correct:"Fold",grade:{Fold:"A",Call:"C","Raise 12BB":"D"},
+   freqs:{Fold:55,Call:40,"Raise 12BB":5},
+   explanation:"AT en K93 es solo backdoor draw sin showdown value real. No alcanza el precio para continuar frecuentemente.",
+   insight:"AT en tableros king-high sin pair ni draw decente es muchas veces fold. No te aferrés al Ace top."},
+
+  {street:"turn",pos:"BTN",vpos:"BB",cards:["7s","6s"],board:["8h","5d","2c","Ah"],pot:14,stack:86,toCall:8,
+   situation:"BB donk-apuesta el turn de Ace. Tenés str8 (76 en 8-5-2-A).",
+   actions:["Fold","Call","Raise 24BB"],
+   correct:"Raise",grade:{Fold:"F",Call:"C","Raise 24BB":"A"},
+   freqs:{Fold:0,Call:15,"Raise 24BB":85},
+   explanation:"Tenés el straight hecho. La apuesta del BB puede ser value o semi-bluff. Subís para cobrar equity.",
+   insight:"Con manos muy fuertes frente a donk bets, el raise es casi siempre correcto. No des precio a draws."},
+];
+
+// ═══════════════════════════════════════════════════
+//  QUIZ LOGIC
+// ═══════════════════════════════════════════════════
+function getQuizQuestion(mode, position) {
+  if(mode==="rfi") {
+    const rng=RFI[position]||RFI.BTN;
+    const row=Math.floor(Math.random()*13), col=Math.floor(Math.random()*13);
+    const hand=handStr(row,col);
+    const freq=rng[hand]||0;
+    return {hand, position, mode:"rfi", freqOpen:freq, freqFold:100-freq, row, col};
+  } else {
+    const scenarios_bb=["vs BTN","vs CO"];
+    const scen=position||scenarios_bb[Math.floor(Math.random()*scenarios_bb.length)];
+    const rng=BB_DEF[scen]||BB_DEF["vs BTN"];
+    const row=Math.floor(Math.random()*13), col=Math.floor(Math.random()*13);
+    const hand=handStr(row,col);
+    const d=rng[hand]||{c:0,r:0};
+    return {hand, scenario:scen, mode:"bb", freqCall:d.c||0, freqRaise:d.r||0, freqFold:100-(d.c||0)-(d.r||0), row, col};
+  }
+}
+
+function evalQuizAnswer(q, action) {
+  if(q.mode==="rfi") {
+    const correct = q.freqOpen>=50?"open":"fold";
+    const chosen = /fold/i.test(action)?"fold":"open";
+    const diff = Math.abs(q.freqOpen - (chosen==="open"?q.freqOpen:q.freqFold));
+    if(chosen===correct) {
+      if(q.freqOpen>=90||q.freqOpen<=10) return {grade:"A",ok:true};
+      if(q.freqOpen>=70||q.freqOpen<=30) return {grade:"B+",ok:true};
+      return {grade:"C+",ok:true,note:"Mano mixta, ambas acciones son válidas"};
+    } else {
+      if(q.freqOpen>=85||q.freqOpen<=15) return {grade:"F",ok:false};
+      if(q.freqOpen>=65||q.freqOpen<=35) return {grade:"D",ok:false};
+      return {grade:"C",ok:false,note:"Mano muy mixta, no es un error grave"};
+    }
+  } else {
+    const best = q.freqRaise>=40?"raise":q.freqCall>=40?"call":"fold";
+    const chosen = /raise|3-?bet/i.test(action)?"raise":/call/i.test(action)?"call":"fold";
+    const ok = chosen===best || 
+      (best==="call"&&chosen==="raise"&&q.freqRaise>20) ||
+      (best==="raise"&&chosen==="call"&&q.freqCall>20);
+    if(ok) return {grade: q.freqFold<20?"A":"B+", ok:true};
+    if(chosen==="fold"&&q.freqFold<30) return {grade:"D",ok:false};
+    if(chosen==="fold"&&q.freqFold<10) return {grade:"F",ok:false};
+    return {grade:"C",ok:false};
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  CARD RENDERS
+// ═══════════════════════════════════════════════════
+function cardHTML(card, sz) {
+  const dims={sm:[36,50,10,13],md:[48,66,13,17],lg:[58,80,16,21]}[sz||"md"];
+  const [w,h,fr,fs]=dims;
+  if(!card||card==="?") return `<div style="width:${w}px;height:${h}px;border-radius:5px;background:linear-gradient(135deg,#1a3a6e,#2a5ab8);border:2px solid rgba(255,255,255,.15);flex-shrink:0"></div>`;
+  const rank=card.slice(0,-1),suit=card.slice(-1).toLowerCase();
+  const col=(suit==="h"||suit==="d")?"#b91c1c":"#111";
+  return `<div style="width:${w}px;height:${h}px;background:#fff;border-radius:5px;border:1px solid #ccc;padding:3px 4px;display:flex;flex-direction:column;box-shadow:0 2px 8px rgba(0,0,0,.45);flex-shrink:0"><span style="color:${col};font-size:${fr}px;font-weight:800;line-height:1;font-family:monospace">${rank}</span><span style="color:${col};font-size:${fs}px;line-height:1">${SUIT_SYM[suit]||suit}</span></div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════
+let state={
+  tab:"quiz",
+  // Quiz
+  quizMode:"rfi",
+  quizPos:"BTN",
+  quizBbScen:"vs BTN",
+  quizQ:null,
+  quizResult:null,
+  quizStats:{n:0,correct:0,grades:{}},
+  // Scenarios
+  scIdx:0,
+  scResult:null,
+  scFilter:"all",
+  // Ranges
+  rangeMode:"rfi",
+  rangePos:"BTN",
+  rangeBbScen:"vs BTN",
+  rangeHover:null,
+  rangeSelected:null,
+};
+
+function setState(patch){
+  state=Object.assign({},state,patch);
+  render();
+}
+
+// ═══════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════
+function render(){
+  document.getElementById("app").innerHTML=buildApp();
+  bindEvents();
+}
+
+function buildApp(){
+  return `
+  <div style="min-height:100vh;background:#080f0a">
+    <style>
+      @keyframes spin{to{transform:rotate(360deg)}}
+      @keyframes pop{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+      button:hover:not(:disabled){filter:brightness(1.15);cursor:pointer}
+      button:active:not(:disabled){transform:scale(.97)}
+      .card-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    </style>
+    ${buildHeader()}
+    ${buildTabs()}
+    ${state.tab==="quiz"?buildQuiz():state.tab==="scenarios"?buildScenarios():buildRanges()}
+  </div>`;
+}
+
+function buildHeader(){
+  return `<div style="padding:14px 24px;background:linear-gradient(to right,#050c07,#0e1e11,#050c07);border-bottom:1px solid rgba(201,168,76,.18);display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-family:'Playfair Display',serif;font-size:22px;font-weight:700;background:linear-gradient(135deg,#c9a84c,#e8c96b,#c9a84c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px">♠ POKER TRAINER</div>
+      <div style="font-size:9px;color:#8a9e8a;letter-spacing:4px;text-transform:uppercase;font-family:monospace">GTO Offline Edition · Sin conexión requerida</div>
+    </div>
+    <div style="font-size:9px;color:#4caf7d;font-family:monospace;text-align:right;line-height:1.7">● OFFLINE<br><span style="color:#8a9e8a">100% gratis</span></div>
+  </div>`;
+}
+
+function buildTabs(){
+  const tabs=[["quiz","🎯 Quiz de Rangos"],["scenarios","📋 Escenarios"],["ranges","♟ Rangos GTO"]];
+  return `<div style="display:flex;padding:0 24px;background:#0c1e10;border-bottom:1px solid rgba(201,168,76,.18)">
+    ${tabs.map(([id,label])=>`<div onclick="setState({tab:'${id}'})" style="padding:13px 20px;cursor:pointer;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;font-family:monospace;color:${state.tab===id?"#c9a84c":"#8a9e8a"};border-bottom:2px solid ${state.tab===id?"#c9a84c":"transparent"};transition:all .18s">${label}</div>`).join("")}
+  </div>`;
+}
+
+// ─── QUIZ ───────────────────────────────────────────
+function buildQuiz(){
+  const s=state;
+  const q=s.quizQ;
+  const res=s.quizResult;
+  const st=s.quizStats;
+
+  const modeBar=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    ${[["rfi","RFI — Apertura","#c9a84c"],["bb","BB Defensa","#4caf7d"]].map(([id,lbl,col])=>
+      `<button onclick="setState({quizMode:'${id}',quizQ:null,quizResult:null})" style="padding:7px 16px;border-radius:7px;background:${s.quizMode===id?"rgba(201,168,76,.18)":"rgba(255,255,255,.04)"};border:1px solid ${s.quizMode===id?"rgba(201,168,76,.5)":"rgba(255,255,255,.1)"};color:${s.quizMode===id?col:"#8a9e8a"};font-size:10px;font-weight:700;letter-spacing:1px;font-family:monospace">${lbl}</button>`
+    ).join("")}
+    <div style="flex:1"></div>
+    ${st.n>0?`<span style="font-size:11px;font-family:monospace;color:#8a9e8a">
+      <span style="color:#c9a84c">${st.correct}</span>/${st.n} correctas
+      (<span style="color:#c9a84c">${Math.round(st.correct/st.n*100)}%</span>)
+    </span>`:""}
+  </div>`;
+
+  const posBar = s.quizMode==="rfi"
+    ? `<div style="display:flex;gap:5px;flex-wrap:wrap">
+        ${["UTG","HJ","CO","BTN","SB"].map(p=>`<button onclick="setState({quizPos:'${p}',quizQ:null,quizResult:null})" style="padding:5px 13px;border-radius:6px;background:${s.quizPos===p?"rgba(201,168,76,.2)":"rgba(255,255,255,.04)"};border:1px solid ${s.quizPos===p?"rgba(201,168,76,.48)":"rgba(255,255,255,.08)"};color:${s.quizPos===p?"#c9a84c":"#8a9e8a"};font-size:10px;font-weight:700;letter-spacing:1px;font-family:monospace">${p}</button>`).join("")}
+      </div>`
+    : `<div style="display:flex;gap:5px">
+        ${["vs BTN","vs CO"].map(sc=>`<button onclick="setState({quizBbScen:'${sc}',quizQ:null,quizResult:null})" style="padding:5px 13px;border-radius:6px;background:${s.quizBbScen===sc?"rgba(76,175,125,.2)":"rgba(255,255,255,.04)"};border:1px solid ${s.quizBbScen===sc?"rgba(76,175,125,.48)":"rgba(255,255,255,.08)"};color:${s.quizBbScen===sc?"#4caf7d":"#8a9e8a"};font-size:10px;font-weight:700;letter-spacing:1px;font-family:monospace">${sc}</button>`).join("")}
+      </div>`;
+
+  if(!q){
+    return `<div style="padding:32px;display:flex;flex-direction:column;gap:20px;align-items:center">
+      ${modeBar}${posBar}
+      <div style="display:flex;flex-direction:column;align-items:center;gap:18px;margin-top:40px">
+        <div style="font-family:'Playfair Display',serif;font-size:26px;color:#c9a84c;text-align:center">Quiz de Rangos</div>
+        <div style="font-size:13px;color:#8a9e8a;text-align:center;max-width:360px;line-height:1.75">
+          Te mostramos una mano y una posición. Decidís la acción correcta según GTO.
+          Sin IA, sin costos — basado en rangos reales de solvers.
+        </div>
+        <button id="btn-new-q" style="padding:14px 36px;border-radius:8px;background:linear-gradient(135deg,#c9a84c,#e8c96b);color:#0a1a0c;border:none;font-size:14px;font-weight:800;letter-spacing:1px;text-transform:uppercase;font-family:sans-serif">
+          Empezar Quiz ♠
+        </button>
+      </div>
+    </div>`;
+  }
+
+  // Question card
+  const handDisp=q.hand;
+  const isPair=q.row===q.col, isSuit=q.row<q.col;
+  const handLabel=isPair?handDisp:isSuit?handDisp:handDisp;
+
+  // Suit display for the hand
+  const suits=[["h","♥","#c0392b"],["d","♦","#c0392b"],["c","♣","#111"],["s","♠","#111"]];
+  const s1=suits[Math.floor(Math.random()*4)], s2=suits[Math.floor(Math.random()*4)];
+  const c1=q.hand.charAt(0)+(isSuit||isPair?s1[0]:s1[0]);
+  const c2=q.hand.charAt(isPair?0:1)+(isSuit?s1[0]:s2[0]);
+
+  let actionButtons="", freqSection="";
+  if(q.mode==="rfi"){
+    actionButtons=`
+      <button id="quiz-open" style="padding:14px 32px;border-radius:8px;background:rgba(76,175,125,.15);border:1px solid rgba(76,175,125,.4);color:#4caf7d;font-size:15px;font-weight:800;font-family:sans-serif">
+        Abrir / Raise
+      </button>
+      <button id="quiz-fold" style="padding:14px 32px;border-radius:8px;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);color:#e74c3c;font-size:15px;font-weight:800;font-family:sans-serif">
+        Fold
+      </button>`;
+  } else {
+    actionButtons=`
+      <button id="quiz-raise" style="padding:12px 24px;border-radius:8px;background:rgba(76,175,125,.15);border:1px solid rgba(76,175,125,.4);color:#4caf7d;font-size:14px;font-weight:800;font-family:sans-serif">3-Bet</button>
+      <button id="quiz-call" style="padding:12px 24px;border-radius:8px;background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.35);color:#60a5fa;font-size:14px;font-weight:800;font-family:sans-serif">Call</button>
+      <button id="quiz-fold" style="padding:12px 24px;border-radius:8px;background:rgba(231,76,60,.12);border:1px solid rgba(231,76,60,.35);color:#e74c3c;font-size:14px;font-weight:800;font-family:sans-serif">Fold</button>`;
+  }
+
+  if(res){
+    const gradeCol=GRADE_COL[res.grade]||"#8a9e8a";
+    const freqs = q.mode==="rfi"
+      ? [["Abrir",q.freqOpen],["Fold",q.freqFold]]
+      : [["3-Bet",q.freqRaise],["Call",q.freqCall],["Fold",q.freqFold]];
+    freqSection=`
+    <div style="background:#0c1e10;border:1px solid rgba(201,168,76,.22);border-radius:10px;padding:20px;width:100%;max-width:440px;animation:pop .25s ease">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+        <div style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid ${gradeCol};background:${gradeCol}18;color:${gradeCol};font-size:22px;font-weight:800;font-family:monospace;flex-shrink:0">${res.grade}</div>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:${res.ok?"#4caf7d":"#e74c3c"}">${res.ok?"✓ Correcto":"✗ Incorrecto"}</div>
+          ${res.note?`<div style="font-size:11px;color:#8a9e8a;margin-top:3px">${res.note}</div>`:""}
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        ${freqs.map(([a,p])=>{
+          const col=/fold/i.test(a)?"#e74c3c":/call/i.test(a)?"#60a5fa":/3-?bet|raise/i.test(a)?"#4caf7d":"#c9a84c";
+          return `<div style="margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;font-family:monospace;color:#8a9e8a">
+              <span>${a}</span><span style="color:${col}">${p}%</span>
+            </div>
+            <div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden">
+              <div style="width:${p}%;height:100%;background:${col};border-radius:3px;transition:width .5s"></div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+      <button id="btn-new-q" style="padding:11px 24px;border-radius:7px;background:linear-gradient(135deg,#c9a84c,#e8c96b);color:#0a1a0c;border:none;font-size:13px;font-weight:800;font-family:sans-serif">
+        Siguiente →
+      </button>
+    </div>`;
+  }
+
+  return `<div style="padding:24px;display:flex;flex-direction:column;gap:16px;align-items:center">
+    ${modeBar}${posBar}
+    <div style="background:#0c1e10;border:1px solid rgba(201,168,76,.22);border-radius:12px;padding:28px;display:flex;flex-direction:column;align-items:center;gap:20px;width:100%;max-width:440px;margin-top:8px">
+      <div style="font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#8a9e8a;font-family:monospace">
+        ${q.mode==="rfi"?`RFI — ${q.position}`:`BB vs ${q.scenario}`}
+      </div>
+      <div style="font-size:52px;font-weight:800;color:#c9a84c;font-family:monospace;letter-spacing:3px">${handLabel}</div>
+      <div style="font-size:11px;color:#8a9e8a;font-family:monospace">${combos(q.hand)} combinaciones posibles</div>
+      ${!res?`<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">${actionButtons}</div>`:""}
+    </div>
+    ${freqSection}
+  </div>`;
+}
+
+// ─── SCENARIOS ──────────────────────────────────────
+function buildScenarios(){
+  const s=state;
+  const filters=[["all","Todos"],["preflop","Preflop"],["flop","Flop"],["turn","Turn"],["river","River"]];
+  const filtered = s.scFilter==="all"?SCENARIOS:SCENARIOS.filter(sc=>sc.street===s.scFilter);
+  const sc = filtered[s.scIdx % filtered.length];
+  const res=s.scResult;
+
+  const stC={preflop:"#a78bfa",flop:"#4caf7d",turn:"#c9a84c",river:"#e74c3c"};
+  const stCol=stC[sc.street]||"#8a9e8a";
+
+  // Board HTML
+  const boardHTML = sc.board.length>0
+    ? `<div style="display:flex;gap:5px;margin:6px 0">${sc.board.map(c=>cardHTML(c,"sm")).join("")}</div>`
+    : `<div style="font-size:11px;color:#8a9e8a;font-family:monospace;margin:4px 0">— PREFLOP —</div>`;
+
+  let resultSection="";
+  if(res){
+    const gradeCol=GRADE_COL[res.grade]||"#8a9e8a";
+    const isGood = ["A","A+","B+","B"].includes(res.grade);
+    resultSection=`
+    <div style="background:#0b1a0e;border:1px solid ${isGood?"rgba(76,175,125,.3)":"rgba(231,76,60,.3)"};border-radius:10px;padding:18px;animation:pop .25s ease">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div style="width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid ${gradeCol};background:${gradeCol}18;color:${gradeCol};font-size:20px;font-weight:800;font-family:monospace;flex-shrink:0">${res.grade}</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#f0ead6">Jugaste: <span style="color:${gradeCol}">${res.action}</span></div>
+          <div style="font-size:11px;color:#8a9e8a;margin-top:2px">Ideal: ${sc.correct}</div>
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        ${Object.entries(sc.freqs).map(([a,p])=>{
+          const col=/fold/i.test(a)?"#e74c3c":/call|check/i.test(a)?"#4caf7d":"#c9a84c";
+          return `<div style="margin-bottom:7px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;font-family:monospace;color:#8a9e8a"><span>${a}</span><span style="color:${col}">${p}%</span></div>
+            <div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden"><div style="width:${p}%;height:100%;background:${col};border-radius:2px"></div></div>
+          </div>`;
+        }).join("")}
+      </div>
+      <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.2);border-radius:7px;padding:12px;margin-bottom:12px">
+        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,.6);font-family:monospace;margin-bottom:5px">ANÁLISIS</div>
+        <div style="font-size:12px;color:#f0ead6;line-height:1.75">${sc.explanation}</div>
+      </div>
+      <div style="background:rgba(76,175,125,.05);border:1px solid rgba(76,175,125,.2);border-radius:7px;padding:12px;margin-bottom:14px">
+        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(76,175,125,.6);font-family:monospace;margin-bottom:5px">LECCIÓN CLAVE</div>
+        <div style="font-size:12px;color:#f0ead6;line-height:1.75">${sc.insight}</div>
+      </div>
+      <button id="btn-next-sc" style="padding:11px 24px;border-radius:7px;background:linear-gradient(135deg,#c9a84c,#e8c96b);color:#0a1a0c;border:none;font-size:13px;font-weight:800;font-family:sans-serif">
+        Siguiente Escenario →
+      </button>
+    </div>`;
+  }
+
+  return `<div style="padding:24px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${filters.map(([id,lbl])=>`<button onclick="setState({scFilter:'${id}',scIdx:0,scResult:null})" style="padding:5px 14px;border-radius:6px;background:${s.scFilter===id?"rgba(201,168,76,.2)":"rgba(255,255,255,.04)"};border:1px solid ${s.scFilter===id?"rgba(201,168,76,.48)":"rgba(255,255,255,.08)"};color:${s.scFilter===id?"#c9a84c":"#8a9e8a"};font-size:10px;font-weight:700;font-family:monospace">${lbl}</button>`).join("")}
+      <div style="flex:1"></div>
+      <span style="font-size:11px;color:#8a9e8a;font-family:monospace;align-self:center">${(s.scIdx%filtered.length)+1} / ${filtered.length}</span>
+    </div>
+
+    <div style="background:#0c1e10;border:1px solid rgba(201,168,76,.22);border-radius:12px;padding:20px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <span style="padding:2px 9px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;font-family:monospace;background:${stCol}18;color:${stCol};border:1px solid ${stCol}44">${sc.street}</span>
+        <span style="font-size:9px;letter-spacing:2px;text-transform:uppercase;font-family:monospace;color:#8a9e8a">${sc.pos} vs ${sc.vpos}</span>
+        <span style="font-size:9px;color:#8a9e8a;font-family:monospace;margin-left:auto">Bote: ${sc.pot} BB · Stack: ${sc.stack} BB</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        ${sc.cards.map(c=>cardHTML(c,"md")).join("")}
+        ${sc.board.length>0?`<div style="width:1px;height:54px;background:rgba(201,168,76,.2);margin:0 4px"></div>`:""} 
+        ${sc.board.map(c=>cardHTML(c,"sm")).join("")}
+      </div>
+      <div style="font-size:13px;color:#f0ead6;line-height:1.75;margin-bottom:16px">${sc.situation}${sc.toCall>0?`<br><span style="color:#c9a84c;font-family:monospace;font-size:12px">→ Te cuesta ${sc.toCall} BB llamar</span>`:""}</div>
+      ${!res?`<div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${sc.actions.map(a=>{
+          const col=/fold/i.test(a)?"#e74c3c":/call|check/i.test(a)?"#4caf7d":"#c9a84c";
+          const id="sc-act-"+a.replace(/\s+/g,"-");
+          return `<button data-action="${a}" class="sc-action" style="padding:11px 20px;border-radius:7px;background:${col}16;border:1px solid ${col}44;color:${col};font-size:13px;font-weight:700;font-family:sans-serif">${a}</button>`;
+        }).join("")}
+      </div>`:""}
+    </div>
+
+    ${resultSection}
+  </div>`;
+}
+
+// ─── RANGES ─────────────────────────────────────────
+function buildRanges(){
+  const s=state;
+  const C=34;
+
+  function getCell(row,col){
+    const h=handStr(row,col);
+    if(s.rangeMode==="rfi") return {hand:h,freq:RFI[s.rangePos]?.[h]||0,type:"rfi"};
+    const d=BB_DEF[s.rangeBbScen]?.[h]||{c:0,r:0};
+    return {hand:h,call:d.c||0,raise:d.r||0,fold:100-(d.c||0)-(d.r||0),type:"bb"};
+  }
+  function getCellBg(row,col){const c=getCell(row,col);return c.type==="rfi"?rfiColor(c.freq):bbColor(c.call,c.raise);}
+
+  let totalC=0;
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++){
+    const c=getCell(i,j);
+    totalC+=c.type==="rfi"?combos(c.hand)*(c.freq/100):combos(c.hand)*((c.call+c.raise)/100);
+  }
+  const pct=(totalC/1326*100).toFixed(1);
+
+  // Build grid
+  let gridRows="";
+  for(let row=0;row<13;row++){
+    let cells="";
+    for(let col=0;col<13;col++){
+      const h=handStr(row,col);
+      const bg=getCellBg(row,col);
+      const isSel=s.rangeSelected&&s.rangeSelected.row===row&&s.rangeSelected.col===col;
+      const isPair=row===col,isSuit=row<col;
+      const label=isPair?h:isSuit?`${RANKS[row]}${RANKS[col]}s`:`${RANKS[col]}${RANKS[row]}o`;
+      cells+=`<div data-row="${row}" data-col="${col}" class="range-cell" style="width:${C-1}px;height:${C-1}px;margin:0 1px 0 0;border-radius:2px;background:${bg};border:${isSel?"1.5px solid rgba(255,255,255,.7)":"1px solid transparent"};cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <span style="font-size:7.5px;font-family:monospace;font-weight:700;color:${isPair?"#f0ead6":isSuit?"#a8d5be":"#d5c8a8"};line-height:1;opacity:.9">${label}</span>
+      </div>`;
+    }
+    gridRows+=`<div style="display:flex;margin-bottom:1px">
+      <div style="width:${C}px;font-size:9px;color:rgba(240,234,214,.4);font-family:monospace;font-weight:700;display:flex;align-items:center;justify-content:center">${RANKS[row]}</div>
+      ${cells}
+    </div>`;
+  }
+
+  // Selected panel
+  let selPanel="";
+  if(s.rangeSelected){
+    const cell=s.rangeSelected.cell;
+    const freqs=cell.type==="rfi"
+      ?[["Abrir",cell.freq,"#4caf7d"],["Fold",100-cell.freq,"#e74c3c"]]
+      :[["3-Bet",cell.raise,"#4caf7d"],["Call",cell.call,"#60a5fa"],["Fold",cell.fold,"#e74c3c"]];
+    
+    // GTO tip
+    let tip="";
+    if(cell.type==="rfi"){
+      if(cell.freq>=90) tip=`Apertura estándar al 100% desde ${s.rangePos}. Mano demasiado fuerte para fold.`;
+      else if(cell.freq>=65) tip=`Apertura frecuente (~${cell.freq}%). Parte del rango core de ${s.rangePos}.`;
+      else if(cell.freq>=35) tip=`Mano mixta (~${cell.freq}%). GTO abre y foldea a veces. Depende de la dinámica.`;
+      else if(cell.freq>0) tip=`Apertura poco frecuente (${cell.freq}%). Parte del rango de balance, no obligatoria.`;
+      else tip=`Fold desde ${s.rangePos}. Esta mano no tiene suficiente equity para abrir en esta posición.`;
+    } else {
+      const best=cell.raise>=40?"3-bet":cell.call>=40?"call":"fold";
+      if(best==="3-bet") tip=`3-bet frecuente (${cell.raise}%) como valor o semi-bluff. Mano muy fuerte o con buen bloqueador.`;
+      else if(best==="call") tip=`Defensa principalmente llamando (${cell.call}%). Buen precio para ver el flop.`;
+      else tip=`Fold frecuente (${cell.fold}%). No alcanza el umbral de defensa ${s.rangeBbScen}.`;
+    }
+
+    selPanel=`<div style="background:#0b1a0e;border:1px solid rgba(201,168,76,.22);border-radius:10px;padding:18px;margin-top:12px">
+      <div style="display:flex;gap:10px;align-items:baseline;margin-bottom:12px">
+        <span style="font-size:26px;font-weight:800;color:#c9a84c;font-family:monospace">${cell.hand}</span>
+        <span style="font-size:10px;color:#8a9e8a;font-family:monospace">${combos(cell.hand)} combos</span>
+      </div>
+      ${freqs.map(([a,p,col])=>`<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;font-family:monospace;color:#8a9e8a"><span>${a}</span><span style="color:${col}">${p}%</span></div>
+        <div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden"><div style="width:${p}%;height:100%;background:${col};border-radius:3px;transition:width .4s"></div></div>
+      </div>`).join("")}
+      <div style="background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.18);border-radius:7px;padding:12px;margin-top:8px">
+        <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,.6);font-family:monospace;margin-bottom:5px">POR QUÉ</div>
+        <div style="font-size:12px;color:#f0ead6;line-height:1.75">${tip}</div>
+      </div>
+    </div>`;
+  }
+
+  return `<div style="padding:20px 24px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      ${[["rfi","RFI — Apertura","rgba(201,168,76,.18)","rgba(201,168,76,.5)","#c9a84c"],["bb","BB Defensa","rgba(76,175,125,.18)","rgba(76,175,125,.5)","#4caf7d"]].map(([id,lbl,bg,bd,col])=>
+        `<button onclick="setState({rangeMode:'${id}',rangeSelected:null})" style="padding:7px 16px;border-radius:7px;background:${s.rangeMode===id?bg:"rgba(255,255,255,.04)"};border:1px solid ${s.rangeMode===id?bd:"rgba(255,255,255,.1)"};color:${s.rangeMode===id?col:"#8a9e8a"};font-size:10px;font-weight:700;letter-spacing:1px;font-family:monospace">${lbl}</button>`
+      ).join("")}
+      <div style="flex:1"></div>
+      <span style="font-size:11px;font-family:monospace;color:#8a9e8a"><span style="color:#c9a84c">${Math.round(totalC)}</span> combos · <span style="color:#c9a84c">${pct}%</span></span>
+    </div>
+    <div style="display:flex;gap:5px;margin-bottom:14px">
+      ${s.rangeMode==="rfi"
+        ?["UTG","HJ","CO","BTN","SB"].map(p=>`<button onclick="setState({rangePos:'${p}',rangeSelected:null})" style="padding:5px 13px;border-radius:6px;background:${s.rangePos===p?"rgba(201,168,76,.2)":"rgba(255,255,255,.04)"};border:1px solid ${s.rangePos===p?"rgba(201,168,76,.48)":"rgba(255,255,255,.08)"};color:${s.rangePos===p?"#c9a84c":"#8a9e8a"};font-size:10px;font-weight:700;font-family:monospace">${p}</button>`).join("")
+        :["vs BTN","vs CO"].map(sc=>`<button onclick="setState({rangeBbScen:'${sc}',rangeSelected:null})" style="padding:5px 13px;border-radius:6px;background:${s.rangeBbScen===sc?"rgba(76,175,125,.2)":"rgba(255,255,255,.04)"};border:1px solid ${s.rangeBbScen===sc?"rgba(76,175,125,.48)":"rgba(255,255,255,.08)"};color:${s.rangeBbScen===sc?"#4caf7d":"#8a9e8a"};font-size:10px;font-weight:700;font-family:monospace">${sc}</button>`).join("")
+      }
+    </div>
+    <div style="overflow-x:auto">
+      <div style="user-select:none;min-width:${C*14}px">
+        <div style="display:flex;margin-bottom:1px">
+          <div style="width:${C}px"></div>
+          ${RANKS.map(r=>`<div style="width:${C}px;text-align:center;font-size:9px;color:rgba(240,234,214,.4);font-family:monospace;font-weight:700">${r}</div>`).join("")}
+        </div>
+        ${gridRows}
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
+      ${s.rangeMode==="rfi"
+        ?[[100,"100%"],[70,"70%"],[50,"50%"],[30,"30%"],[10,"10%"],[0,"Fold"]].map(([f,l])=>`<div style="display:flex;align-items:center;gap:5px"><div style="width:11px;height:11px;border-radius:2px;background:${rfiColor(f)};border:1px solid rgba(255,255,255,.1)"></div><span style="font-size:9px;color:#8a9e8a;font-family:monospace">${l}</span></div>`).join("")
+        :[[0,80,"3-bet"],[0,30,"3-bet mix"],[70,0,"Call"],[30,0,"Call mix"],[0,0,"Fold"]].map(([c,r,l])=>`<div style="display:flex;align-items:center;gap:5px"><div style="width:11px;height:11px;border-radius:2px;background:${bbColor(c,r)};border:1px solid rgba(255,255,255,.1)"></div><span style="font-size:9px;color:#8a9e8a;font-family:monospace">${l}</span></div>`).join("")
+      }
+    </div>
+    <div style="font-size:11px;color:rgba(201,168,76,.5);margin-top:8px;font-family:monospace">↑ Click en cualquier mano para ver el análisis</div>
+    ${selPanel}
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════
+//  EVENT BINDING
+// ═══════════════════════════════════════════════════
+function bindEvents(){
+  // Quiz - new question
+  const btnNewQ=document.getElementById("btn-new-q");
+  if(btnNewQ){
+    btnNewQ.addEventListener("click",()=>{
+      const q=getQuizQuestion(state.quizMode, state.quizMode==="rfi"?state.quizPos:state.quizBbScen);
+      setState({quizQ:q,quizResult:null});
+    });
+  }
+
+  // Quiz - answer buttons
+  const qOpen=document.getElementById("quiz-open");
+  if(qOpen) qOpen.addEventListener("click",()=>answerQuiz("open"));
+  const qFold=document.getElementById("quiz-fold");
+  if(qFold) qFold.addEventListener("click",()=>answerQuiz("fold"));
+  const qRaise=document.getElementById("quiz-raise");
+  if(qRaise) qRaise.addEventListener("click",()=>answerQuiz("raise"));
+  const qCall=document.getElementById("quiz-call");
+  if(qCall) qCall.addEventListener("click",()=>answerQuiz("call"));
+
+  // Scenarios - action buttons
+  document.querySelectorAll(".sc-action").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const action=btn.getAttribute("data-action");
+      const sc=getFilteredScenarios()[state.scIdx % getFilteredScenarios().length];
+      const gradeMap=sc.grade;
+      // Find matching grade key
+      let grade="C";
+      for(const [key,g] of Object.entries(gradeMap)){
+        if(action.toLowerCase().includes(key.toLowerCase())||key.toLowerCase().includes(action.toLowerCase())){grade=g;break;}
+        if(sc.correct&&action.toLowerCase().includes(sc.correct.toLowerCase())){grade="A";break;}
+      }
+      // Direct lookup
+      grade=gradeMap[action]||grade;
+      setState({scResult:{grade,action}});
+    });
+  });
+
+  // Scenarios - next
+  const btnNextSc=document.getElementById("btn-next-sc");
+  if(btnNextSc){
+    btnNextSc.addEventListener("click",()=>{
+      setState({scIdx:state.scIdx+1,scResult:null});
+    });
+  }
+
+  // Ranges - cell clicks
+  document.querySelectorAll(".range-cell").forEach(cell=>{
+    cell.addEventListener("click",()=>{
+      const row=parseInt(cell.getAttribute("data-row"));
+      const col=parseInt(cell.getAttribute("data-col"));
+      const h=handStr(row,col);
+      let cellData;
+      if(state.rangeMode==="rfi"){
+        cellData={hand:h,freq:RFI[state.rangePos]?.[h]||0,type:"rfi"};
+      } else {
+        const d=BB_DEF[state.rangeBbScen]?.[h]||{c:0,r:0};
+        cellData={hand:h,call:d.c||0,raise:d.r||0,fold:100-(d.c||0)-(d.r||0),type:"bb"};
+      }
+      setState({rangeSelected:{row,col,cell:cellData}});
+    });
+  });
+}
+
+function getFilteredScenarios(){
+  return state.scFilter==="all"?SCENARIOS:SCENARIOS.filter(sc=>sc.street===state.scFilter);
+}
+
+function answerQuiz(action){
+  if(!state.quizQ||state.quizResult)return;
+  const res=evalQuizAnswer(state.quizQ,action);
+  const newStats={
+    n:state.quizStats.n+1,
+    correct:state.quizStats.correct+(res.ok?1:0),
+    grades:Object.assign({},state.quizStats.grades,{[res.grade]:(state.quizStats.grades[res.grade]||0)+1})
+  };
+  setState({quizResult:res,quizStats:newStats});
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>
