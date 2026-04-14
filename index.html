@@ -3,194 +3,410 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Poker GTO Trainer</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<title>♠ Poker GTO Trainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=IBM+Plex+Mono:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+/* ── DESIGN TOKENS ──────────────────────────────────────────── */
 :root{
-  --bg0:#060c08;--bg1:#0b1710;--bg2:#0f2015;--bg3:#152a1c;
-  --gold:#c9a84c;--gold2:#e8c96b;--gold3:#f5e0a0;
-  --green:#3dba74;--green2:#2a9d5c;--green3:#1a6b3f;
-  --red:#e05252;--red2:#b83a3a;
-  --blue:#60a5fa;--blue2:#3b82f6;
-  --text:#eee8d0;--text2:#a8b8a0;--text3:#5a7060;
-  --border:rgba(201,168,76,.18);--border2:rgba(201,168,76,.08);
-  --card-bg:#fff;
+  --bg:         #04080a;
+  --bg1:        #080e11;
+  --bg2:        #0c151a;
+  --bg3:        #111d24;
+  --bg4:        #162028;
+  --glass:      rgba(255,255,255,.03);
+  --glass2:     rgba(255,255,255,.06);
+
+  --gold:       #c8a74a;
+  --gold2:      #e3c96a;
+  --gold3:      #f5e4a8;
+  --gold-dim:   rgba(200,167,74,.15);
+  --gold-line:  rgba(200,167,74,.2);
+
+  --green:      #3ab06b;
+  --green2:     #4dcc82;
+  --green-dim:  rgba(58,176,107,.12);
+  --green-line: rgba(58,176,107,.25);
+
+  --red:        #d95f5f;
+  --red2:       #f07070;
+  --red-dim:    rgba(217,95,95,.12);
+
+  --blue:       #5a9cf5;
+  --blue-dim:   rgba(90,156,245,.12);
+
+  --text:       #e8e0cc;
+  --text2:      #8fa898;
+  --text3:      #4a6055;
+  --text4:      #2a3830;
+
+  --border:     rgba(200,167,74,.14);
+  --border2:    rgba(255,255,255,.06);
+
+  --r-sm:       8px;
+  --r-md:       12px;
+  --r-lg:       16px;
+
+  --shadow-sm:  0 2px 8px rgba(0,0,0,.4);
+  --shadow-md:  0 4px 20px rgba(0,0,0,.5);
+  --shadow-lg:  0 8px 40px rgba(0,0,0,.6);
+  --shadow-gold: 0 0 20px rgba(200,167,74,.15);
 }
+
+/* ── RESET ──────────────────────────────────────────────────── */
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg0);font-family:'Inter',sans-serif;color:var(--text);min-height:100vh}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
-.anim-up{animation:fadeUp .28s ease both}
-.anim-pop{animation:pop .22s ease both}
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:rgba(0,0,0,.1)}
-::-webkit-scrollbar-thumb{background:rgba(201,168,76,.25);border-radius:2px}
-button{cursor:pointer;border:none;font-family:inherit;transition:all .15s}
-button:hover:not(:disabled){filter:brightness(1.14)}
-button:active:not(:disabled){transform:scale(.96)}
-button:disabled{opacity:.45;cursor:not-allowed}
+html{-webkit-font-smoothing:antialiased}
+body{background:var(--bg);font-family:'Inter',sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden}
 
-/* HEADER */
-.header{
-  padding:16px 28px;
-  background:linear-gradient(135deg,var(--bg0) 0%,var(--bg1) 50%,var(--bg0) 100%);
-  border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
+/* ── SCROLLBAR ──────────────────────────────────────────────── */
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--gold-line);border-radius:2px}
+
+/* ── KEYFRAMES ──────────────────────────────────────────────── */
+@keyframes spin    {to{transform:rotate(360deg)}}
+@keyframes fadeUp  {from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn  {from{opacity:0}to{opacity:1}}
+@keyframes pop     {from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
+@keyframes slideIn {from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes glow    {0%,100%{box-shadow:0 0 8px rgba(200,167,74,.2)}50%{box-shadow:0 0 18px rgba(200,167,74,.4)}}
+@keyframes pulse   {0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes barGrow {from{width:0}to{width:var(--w)}}
+
+.anim-up   {animation:fadeUp  .32s cubic-bezier(.22,1,.36,1) both}
+.anim-in   {animation:fadeIn  .25s ease both}
+.anim-pop  {animation:pop     .26s cubic-bezier(.22,1,.36,1) both}
+.anim-slide{animation:slideIn .28s cubic-bezier(.22,1,.36,1) both}
+
+/* ── HEADER ─────────────────────────────────────────────────── */
+#header{
   position:sticky;top:0;z-index:100;
-  backdrop-filter:blur(12px);
+  background:linear-gradient(180deg,var(--bg1) 0%,rgba(8,14,17,.95) 100%);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(20px);
+  padding:0 28px;
+  display:flex;align-items:center;justify-content:space-between;
+  height:64px;
 }
-.logo{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;
-  background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold));
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
-.logo-sub{font-size:9px;color:var(--text3);letter-spacing:4px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-top:2px}
-.badge-offline{font-size:9px;color:var(--green);font-family:'IBM Plex Mono',monospace;
-  background:rgba(61,186,116,.1);border:1px solid rgba(61,186,116,.25);
-  padding:3px 10px;border-radius:20px;letter-spacing:1px}
+.logo{
+  font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;
+  background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 40%,var(--gold3) 70%,var(--gold) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  letter-spacing:3px;line-height:1;
+}
+.logo-sub{font-size:8px;color:var(--text3);letter-spacing:5px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-top:3px}
+.badge-offline{
+  font-size:9px;font-family:'IBM Plex Mono',monospace;letter-spacing:1.5px;
+  color:var(--green);background:var(--green-dim);border:1px solid var(--green-line);
+  padding:4px 12px;border-radius:20px;display:flex;align-items:center;gap:5px;
+}
+.badge-offline::before{content:"●";animation:pulse 2s infinite}
 
-/* TABS */
-.tabs{
-  display:flex;padding:0 28px;
-  background:linear-gradient(to bottom,var(--bg1),var(--bg2));
-  border-bottom:1px solid var(--border2);overflow-x:auto;
+/* ── TABS ───────────────────────────────────────────────────── */
+#tabs{
+  background:var(--bg1);border-bottom:1px solid var(--border);
+  display:flex;overflow-x:auto;padding:0 24px;
+  position:sticky;top:64px;z-index:99;
 }
+#tabs::-webkit-scrollbar{display:none}
 .tab{
-  padding:14px 22px;font-size:11px;font-weight:600;letter-spacing:1.5px;
-  text-transform:uppercase;font-family:'IBM Plex Mono',monospace;
-  color:var(--text3);border-bottom:2px solid transparent;
-  cursor:pointer;transition:all .2s;white-space:nowrap;
+  padding:16px 20px;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  font-family:'IBM Plex Mono',monospace;color:var(--text3);
+  border-bottom:2px solid transparent;cursor:pointer;
+  transition:color .2s,border-color .2s;white-space:nowrap;position:relative;
 }
 .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 .tab:hover:not(.active){color:var(--text2)}
 
-/* CARDS */
-.card{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:20px}
-.card-gold{border-color:var(--border)}
-.section-title{font-family:'Playfair Display',serif;font-size:18px;color:var(--gold);margin-bottom:4px}
-.section-sub{font-size:12px;color:var(--text3);line-height:1.6}
+/* ── LAYOUT ─────────────────────────────────────────────────── */
+.page{padding:24px 28px;min-height:calc(100vh - 120px);animation:fadeIn .2s ease}
+.two-col{display:grid;grid-template-columns:1fr 300px;gap:20px}
+.three-col{display:grid;grid-template-columns:280px 1fr 260px;gap:16px}
 
-/* STATS ROW */
-.stat-box{background:var(--bg1);border:1px solid var(--border2);border-radius:8px;padding:10px 14px;text-align:center}
-.stat-val{font-size:22px;font-weight:700;color:var(--gold);font-family:'IBM Plex Mono',monospace}
-.stat-lbl{font-size:9px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
-
-/* GRADE BADGE */
-.grade{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-family:'IBM Plex Mono',monospace;flex-shrink:0}
-
-/* FREQ BAR */
-.freq-bar-wrap{margin-bottom:10px}
-.freq-bar-label{display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace;color:var(--text3)}
-.freq-bar-track{height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
-.freq-bar-fill{height:100%;border-radius:3px;transition:width .5s ease}
-
-/* POKER TABLE */
-.table-wrap{
-  width:100%;max-width:560px;
-  background:radial-gradient(ellipse at center,#1e8a50 0%,#0d5a30 55%,#094422 100%);
-  border-radius:200px;position:relative;
-  border:10px solid #3d2b1f;
-  box-shadow:0 0 0 3px #5a3e2b,inset 0 0 60px rgba(0,0,0,.5),0 24px 60px rgba(0,0,0,.8);
-  padding:40px 80px;min-height:220px;
-  display:flex;align-items:center;justify-content:center;
+/* ── PANEL ──────────────────────────────────────────────────── */
+.panel{
+  background:var(--bg2);border:1px solid var(--border2);border-radius:var(--r-lg);
+  box-shadow:var(--shadow-sm);overflow:hidden;
 }
-.pos-chip{
-  position:absolute;display:flex;flex-direction:column;align-items:center;gap:3px;
-  white-space:nowrap;
+.panel-gold{border-color:var(--border)}
+.panel-header{
+  padding:16px 20px;border-bottom:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:space-between;
 }
-.pos-label{
-  padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;
-  letter-spacing:1px;font-family:'IBM Plex Mono',monospace;
-}
-.pos-stack{font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace}
+.panel-title{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;color:var(--gold)}
+.panel-body{padding:18px 20px}
 
-/* PLAYING CARDS */
+/* ── SECTION LABEL ──────────────────────────────────────────── */
+.slabel{
+  font-size:9px;letter-spacing:2.5px;text-transform:uppercase;
+  font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-bottom:8px;
+}
+
+/* ── BUTTONS ────────────────────────────────────────────────── */
+button{cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:all .15s;outline:none}
+button:hover:not(:disabled){filter:brightness(1.12)}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.35;cursor:not-allowed}
+
+.btn-primary{
+  background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 100%);
+  color:#050a08;padding:13px 28px;border-radius:var(--r-sm);
+  font-size:12px;font-weight:700;letter-spacing:.5px;
+  box-shadow:0 2px 12px rgba(200,167,74,.3);
+}
+.btn-primary:hover:not(:disabled){box-shadow:0 4px 20px rgba(200,167,74,.45)}
+
+.btn-ghost{
+  background:transparent;border:1px solid var(--border);color:var(--text2);
+  padding:10px 18px;border-radius:var(--r-sm);font-size:12px;
+}
+.btn-ghost:hover:not(:disabled){background:var(--glass);border-color:var(--gold-line);color:var(--gold)}
+
+.btn-action{
+  padding:13px 22px;border-radius:var(--r-sm);font-size:13px;font-weight:600;
+  letter-spacing:.3px;transition:all .18s;
+}
+.btn-fold{background:var(--red-dim);border:1px solid rgba(217,95,95,.3);color:var(--red2)}
+.btn-fold:hover{background:rgba(217,95,95,.2);border-color:rgba(217,95,95,.5)}
+.btn-call{background:var(--green-dim);border:1px solid rgba(58,176,107,.3);color:var(--green2)}
+.btn-call:hover{background:rgba(58,176,107,.22);border-color:rgba(58,176,107,.5)}
+.btn-raise{background:var(--gold-dim);border:1px solid rgba(200,167,74,.3);color:var(--gold2)}
+.btn-raise:hover{background:rgba(200,167,74,.22);border-color:rgba(200,167,74,.5)}
+
+/* TOGGLE PILLS */
+.pill-group{display:flex;background:var(--bg1);border:1px solid var(--border2);border-radius:8px;padding:3px;gap:2px}
+.pill{padding:7px 14px;border-radius:5px;font-size:10px;font-weight:600;letter-spacing:1px;
+  font-family:'IBM Plex Mono',monospace;color:var(--text3);transition:all .18s}
+.pill.active{background:var(--gold-dim);border:1px solid var(--border);color:var(--gold)}
+.pill-green.active{background:var(--green-dim);border:1px solid var(--green-line);color:var(--green2)}
+.pill:hover:not(.active){color:var(--text2)}
+
+/* POS CHIPS */
+.pos-chips{display:flex;gap:4px;flex-wrap:wrap}
+.pos-chip{padding:5px 12px;border-radius:6px;font-size:10px;font-weight:600;letter-spacing:.5px;
+  font-family:'IBM Plex Mono',monospace;background:var(--bg3);border:1px solid var(--border2);color:var(--text3);transition:all .15s}
+.pos-chip.active-gold{background:var(--gold-dim);border-color:var(--border);color:var(--gold)}
+.pos-chip.active-green{background:var(--green-dim);border-color:var(--green-line);color:var(--green2)}
+.pos-chip:hover:not(.active-gold):not(.active-green){color:var(--text2);border-color:var(--border)}
+
+/* ── PLAYING CARDS ──────────────────────────────────────────── */
 .pcard{
-  background:white;border-radius:6px;border:1px solid #d0d0d0;
+  background:linear-gradient(145deg,#ffffff,#f0f0f0);
+  border-radius:5px;border:1px solid rgba(0,0,0,.12);
   display:flex;flex-direction:column;padding:3px 5px;
-  box-shadow:0 2px 10px rgba(0,0,0,.5),0 1px 3px rgba(0,0,0,.3);
-  flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.55),0 1px 2px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.8);
+  flex-shrink:0;position:relative;
 }
 .pcard-back{
-  background:linear-gradient(135deg,#1a3a6e,#2a5ab8);
-  border:2px solid rgba(255,255,255,.15);border-radius:6px;flex-shrink:0;
+  background:linear-gradient(135deg,#0f2540 0%,#1a3a6e 40%,#0f2540 100%);
+  border:1px solid rgba(255,255,255,.12);border-radius:5px;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.5);
 }
 .pcard-rank{font-weight:800;line-height:1;font-family:'IBM Plex Mono',monospace}
 .pcard-suit{line-height:1}
 
-/* RANGE GRID */
-.range-grid-wrap{overflow-x:auto}
-.range-grid{user-select:none;display:inline-block}
-.rg-row{display:flex;gap:1px;margin-bottom:1px}
-.rg-header{font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-weight:700;
-  display:flex;align-items:center;justify-content:center}
-.rg-cell{
-  border-radius:2px;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;border:1px solid transparent;transition:filter .1s,border-color .1s;
-}
-.rg-cell:hover{filter:brightness(1.4);border-color:rgba(255,255,255,.4)}
-.rg-cell.selected{border-color:rgba(255,255,255,.7)!important;box-shadow:0 0 6px rgba(255,255,255,.3)}
-.rg-cell span{font-size:7.5px;font-family:'IBM Plex Mono',monospace;font-weight:700;opacity:.88;line-height:1;text-align:center}
-
-/* ACTION BUTTONS */
-.btn-fold{background:rgba(224,82,82,.14);border:1px solid rgba(224,82,82,.35);color:var(--red);padding:12px 22px;border-radius:8px;font-size:13px;font-weight:700}
-.btn-call{background:rgba(61,186,116,.13);border:1px solid rgba(61,186,116,.35);color:var(--green);padding:12px 22px;border-radius:8px;font-size:13px;font-weight:700}
-.btn-raise{background:rgba(201,168,76,.14);border:1px solid rgba(201,168,76,.38);color:var(--gold);padding:12px 22px;border-radius:8px;font-size:13px;font-weight:700}
-.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a1a0c;padding:13px 32px;border-radius:8px;font-size:13px;font-weight:800;letter-spacing:.5px}
-.btn-secondary{background:rgba(255,255,255,.06);border:1px solid var(--border2);color:var(--text2);padding:11px 20px;border-radius:8px;font-size:12px}
-.btn-sm{padding:5px 13px;border-radius:6px;font-size:10px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px}
-.btn-pos{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:var(--text3)}
-.btn-pos.active{background:rgba(201,168,76,.2);border-color:rgba(201,168,76,.5);color:var(--gold)}
-.btn-pos-green.active{background:rgba(61,186,116,.2);border-color:rgba(61,186,116,.5);color:var(--green)}
-
-/* INSIGHT BOXES */
-.insight-box{border-radius:8px;padding:13px 15px}
-.insight-analysis{background:rgba(201,168,76,.05);border:1px solid rgba(201,168,76,.2)}
-.insight-key{background:rgba(61,186,116,.05);border:1px solid rgba(61,186,116,.2)}
-.insight-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:6px}
-.insight-body{font-size:12px;line-height:1.75;color:var(--text)}
-
-/* STREET PILL */
-.street-pill{padding:2px 9px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace}
-
-/* ANALYZER CARD SLOT */
+/* CARD SLOT */
 .card-slot{
-  width:52px;height:72px;border-radius:7px;
-  border:2px dashed rgba(201,168,76,.3);
-  background:rgba(201,168,76,.04);
+  border-radius:7px;border:1.5px dashed rgba(200,167,74,.3);
+  background:rgba(200,167,74,.03);
   display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;flex-shrink:0;
+  cursor:pointer;transition:all .18s;flex-shrink:0;
 }
-.card-slot:hover{border-color:var(--gold);background:rgba(201,168,76,.1)}
-.card-slot.filled{border-style:solid;border-color:var(--gold);background:transparent;cursor:pointer}
-.card-slot-label{font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace;letter-spacing:1px}
+.card-slot:hover{border-color:var(--gold);background:rgba(200,167,74,.08);box-shadow:var(--shadow-gold)}
+.card-slot.filled{border-style:solid;border-color:rgba(200,167,74,.3);background:transparent}
+.card-slot-plus{font-size:18px;color:var(--text3);transition:color .15s}
+.card-slot:hover .card-slot-plus{color:var(--gold)}
 
-/* CARD PICKER MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px;max-width:420px;width:90%}
-.modal-title{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--gold);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px}
-.card-picker-grid{display:grid;grid-template-columns:repeat(13,1fr);gap:3px;margin-bottom:14px}
+/* ── RANGE GRID ─────────────────────────────────────────────── */
+.rg-wrap{overflow-x:auto;padding-bottom:4px}
+.rg-wrap::-webkit-scrollbar{height:2px}
+.rg-grid{user-select:none;display:inline-flex;flex-direction:column;gap:1px}
+.rg-row{display:flex;gap:1px}
+.rg-head-cell{display:flex;align-items:center;justify-content:center;
+  font-size:8.5px;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-weight:600}
+.rg-cell{
+  border-radius:2px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border:1px solid transparent;transition:filter .1s,border-color .12s;
+}
+.rg-cell:hover{filter:brightness(1.45);border-color:rgba(255,255,255,.35)}
+.rg-cell.sel{border-color:rgba(255,255,255,.75)!important;box-shadow:0 0 8px rgba(255,255,255,.25)}
+.rg-cell span{font-size:7px;font-family:'IBM Plex Mono',monospace;font-weight:700;opacity:.85;line-height:1;text-align:center;pointer-events:none}
+
+/* ── FREQ BARS ──────────────────────────────────────────────── */
+.fbar{margin-bottom:9px}
+.fbar-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.fbar-lbl{font-size:11px;color:var(--text2);font-family:'IBM Plex Mono',monospace}
+.fbar-pct{font-size:12px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.fbar-track{height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.fbar-fill{height:100%;border-radius:2px;transition:width .6s cubic-bezier(.22,1,.36,1)}
+
+/* ── GRADE BADGE ────────────────────────────────────────────── */
+.grade{border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-family:'IBM Plex Mono',monospace;flex-shrink:0;letter-spacing:-0.5px}
+
+/* ── STAT CARDS ─────────────────────────────────────────────── */
+.stat-card{
+  background:var(--bg1);border:1px solid var(--border2);border-radius:var(--r-sm);
+  padding:12px 14px;text-align:center;
+}
+.stat-val{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1}
+.stat-lbl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:4px;font-family:'IBM Plex Mono',monospace}
+
+/* ── INSIGHT BOXES ──────────────────────────────────────────── */
+.ib{border-radius:var(--r-sm);padding:13px 15px}
+.ib-gold{background:rgba(200,167,74,.04);border:1px solid rgba(200,167,74,.15)}
+.ib-green{background:rgba(58,176,107,.04);border:1px solid rgba(58,176,107,.15)}
+.ib-blue{background:rgba(90,156,245,.04);border:1px solid rgba(90,156,245,.15)}
+.ib-red{background:rgba(217,95,95,.04);border:1px solid rgba(217,95,95,.15)}
+.ib-title{font-size:8.5px;letter-spacing:2.5px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:7px}
+.ib-body{font-size:12.5px;line-height:1.75;color:var(--text)}
+
+/* ── STREET PILL ────────────────────────────────────────────── */
+.sp{padding:3px 10px;border-radius:20px;font-size:9px;font-weight:600;letter-spacing:2px;
+  text-transform:uppercase;font-family:'IBM Plex Mono',monospace;display:inline-flex;align-items:center}
+
+/* ── DIVIDER ────────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border2);margin:14px 0}
+
+/* ── POKER TABLE ────────────────────────────────────────────── */
+.poker-table{
+  background:radial-gradient(ellipse at 50% 60%,#1d8a4d 0%,#0d5a2d 55%,#08401f 100%);
+  border-radius:200px;position:relative;
+  border:10px solid #3a2b1c;
+  box-shadow:0 0 0 3px #5a3e28,inset 0 0 70px rgba(0,0,0,.55),0 24px 60px rgba(0,0,0,.85),0 0 0 4px #2a1e10;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ── CARD PICKER MODAL ──────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+.modal{
+  background:var(--bg2);border:1px solid var(--border);border-radius:var(--r-lg);
+  padding:22px;max-width:440px;width:92%;box-shadow:var(--shadow-lg);
+  animation:pop .22s cubic-bezier(.22,1,.36,1);
+}
+.modal-title{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gold);
+  letter-spacing:3px;text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.cp-grid{display:grid;grid-template-columns:repeat(13,1fr);gap:3px;margin-bottom:16px}
 .cp-cell{
   aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;
-  font-size:9px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;
-  background:rgba(255,255,255,.07);border:1px solid transparent;transition:all .12s;
+  font-size:8.5px;font-weight:700;font-family:'IBM Plex Mono',monospace;cursor:pointer;
+  background:rgba(255,255,255,.06);border:1px solid transparent;transition:all .12s;
+  line-height:1.1;text-align:center;
 }
-.cp-cell:hover{filter:brightness(1.3)}
-.cp-cell.used{opacity:.25;cursor:not-allowed}
-.cp-cell.selected{border-color:var(--gold);box-shadow:0 0 8px rgba(201,168,76,.4)}
-.cp-suit-h,.cp-suit-d{color:#e05252}
-.cp-suit-c,.cp-suit-s{color:#eee8d0}
+.cp-cell:hover:not(.used){background:rgba(255,255,255,.14);border-color:var(--gold);transform:scale(1.08)}
+.cp-cell.used{opacity:.2;cursor:not-allowed}
 
-/* BOARD TEXTURE */
-.texture-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:10px;font-family:'IBM Plex Mono',monospace;font-weight:600}
+/* ── EV CALCULATOR ──────────────────────────────────────────── */
+.ev-input-group{margin-bottom:16px}
+.ev-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;
+  color:var(--text3);margin-bottom:7px;display:flex;align-items:center;gap:6px}
+.ev-input{
+  width:100%;background:var(--bg1);border:1px solid var(--border2);border-radius:var(--r-sm);
+  padding:11px 14px;color:var(--text);font-size:14px;font-family:'IBM Plex Mono',monospace;
+  outline:none;transition:border-color .15s;
+}
+.ev-input:focus{border-color:var(--border);background:var(--bg2)}
+.ev-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+  background:var(--bg3);outline:none;cursor:pointer;margin-top:6px}
+.ev-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--gold);cursor:pointer;box-shadow:0 0 8px rgba(200,167,74,.5)}
 
-/* GRID LEGEND */
-.legend-dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(255,255,255,.1);flex-shrink:0}
+.ev-result-card{
+  background:var(--bg1);border:1px solid var(--border2);border-radius:var(--r-md);
+  padding:18px;text-align:center;transition:all .3s;
+}
+.ev-result-val{
+  font-size:36px;font-weight:700;font-family:'IBM Plex Mono',monospace;
+  line-height:1.1;margin:4px 0;
+}
+.ev-result-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;color:var(--text3)}
+
+.ev-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.ev-comp-card{background:var(--bg1);border:1px solid var(--border2);border-radius:var(--r-sm);padding:14px;text-align:center}
+.ev-comp-val{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.ev-comp-lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-top:4px}
+
+.ev-breakdown{background:var(--bg1);border-radius:var(--r-sm);overflow:hidden}
+.ev-breakdown-row{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border2);font-size:12px}
+.ev-breakdown-row:last-child{border-bottom:none}
+.ev-breakdown-lbl{color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:11px}
+.ev-breakdown-val{font-weight:600;font-family:'IBM Plex Mono',monospace}
+
+/* ── MISC ───────────────────────────────────────────────────── */
+.legend-dot{width:11px;height:11px;border-radius:2px;flex-shrink:0}
+.hand-display{
+  font-size:56px;font-weight:700;color:var(--gold);font-family:'IBM Plex Mono',monospace;
+  letter-spacing:4px;line-height:1;text-shadow:0 0 30px rgba(200,167,74,.3);
+}
+.streak-badge{
+  display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;
+  background:rgba(200,167,74,.1);border:1px solid var(--border);font-family:'IBM Plex Mono',monospace;
+  font-size:11px;color:var(--gold);
+}
+.result-correct{border-color:var(--green-line)!important;background:rgba(58,176,107,.03)!important}
+.result-wrong{border-color:rgba(217,95,95,.25)!important;background:rgba(217,95,95,.03)!important}
+
+/* Board texture chips */
+.tex-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
+  font-size:9px;font-weight:600;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px}
+.tex-wet{background:rgba(90,156,245,.1);color:var(--blue);border:1px solid rgba(90,156,245,.2)}
+.tex-dry{background:rgba(200,167,74,.1);color:var(--gold);border:1px solid var(--border)}
+.tex-mono{background:rgba(217,95,95,.1);color:var(--red2);border:1px solid rgba(217,95,95,.2)}
+.tex-pair{background:rgba(58,176,107,.1);color:var(--green2);border:1px solid var(--green-line)}
+
+/* quiz big card */
+.quiz-card{
+  background:linear-gradient(145deg,var(--bg2),var(--bg3));
+  border:1px solid var(--border);border-radius:20px;
+  padding:36px 32px;
+  display:flex;flex-direction:column;align-items:center;gap:18px;
+  box-shadow:var(--shadow-md),inset 0 1px 0 rgba(255,255,255,.04);
+  position:relative;overflow:hidden;
+}
+.quiz-card::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 0%,rgba(200,167,74,.06) 0%,transparent 65%);
+  pointer-events:none;
+}
+
+/* Scenario card */
+.sc-situation{
+  background:var(--bg1);border:1px solid var(--border2);border-radius:var(--r-sm);
+  padding:14px 16px;font-size:13px;line-height:1.75;color:var(--text);
+}
+.sc-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="header">
+  <div>
+    <div class="logo">♠ POKER TRAINER</div>
+    <div class="logo-sub">GTO Offline Edition · 6-max NL Hold'em</div>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);text-align:right;line-height:1.6">
+      GTO Solver<br><span style="color:var(--gold)">100% Local</span>
+    </div>
+    <div class="badge-offline">OFFLINE</div>
+  </div>
+</div>
+<div id="tabs">
+  <div class="tab active" data-tab="quiz"  onclick="switchTab('quiz')" >🎯 Quiz</div>
+  <div class="tab"        data-tab="scenarios" onclick="switchTab('scenarios')">📋 Escenarios</div>
+  <div class="tab"        data-tab="ranges"    onclick="switchTab('ranges')"   >♟ Rangos</div>
+  <div class="tab"        data-tab="analyzer"  onclick="switchTab('analyzer')" >🔬 Analizador</div>
+  <div class="tab"        data-tab="ev"        onclick="switchTab('ev')"       >📐 EV Calc</div>
+</div>
+<div id="page"></div>
+
 <script>
+function switchTab(t){
+  document.querySelectorAll(".tab").forEach(el=>el.classList.toggle("active",el.dataset.tab===t));
+  S.tab=t;renderPage();
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 //  CORE DATA
 // ═══════════════════════════════════════════════════════════════
@@ -1398,6 +1614,694 @@ function resetAnalyzer(){
 // ═══════════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════════
+render();
+
+// ═══════════════════════════════════════════════════════════════
+//  NEW UI RENDER FUNCTIONS (PREMIUM v3)
+// ═══════════════════════════════════════════════════════════════
+
+function pcardHTML(card, sz){
+  const [w,h,fr,fs]={sm:[36,50,10,13],md:[48,66,13,17],lg:[60,84,17,22]}[sz||"md"];
+  if(!card) return `<div class="pcard-back" style="width:${w}px;height:${h}px"></div>`;
+  const rank=card.slice(0,-1),suit=card.slice(-1).toLowerCase();
+  const red=suit==="h"||suit==="d";
+  const col=red?"#c0392b":"#141414";
+  return `<div class="pcard" style="width:${w}px;height:${h}px">
+    <span class="pcard-rank" style="color:${col};font-size:${fr}px">${rank}</span>
+    <span class="pcard-suit" style="color:${col};font-size:${fs}px">${SUIT_SYM[suit]||suit}</span>
+  </div>`;
+}
+
+function slotHTML(card, type, idx, label){
+  const [w,h]=[52,72];
+  if(card) return `<div class="card-slot filled" style="width:${w}px;height:${h}px" onclick="openPicker('${type}',${idx})" title="Click para cambiar">
+    ${pcardHTML(card,"md")}</div>`;
+  return `<div class="card-slot" style="width:${w}px;height:${h}px" onclick="openPicker('${type}',${idx})">
+    <span class="card-slot-plus">${label||"+"}</span></div>`;
+}
+
+function fbarHTML(action, pct, col){
+  const c=col||(/fold/i.test(action)?"var(--red2)":/call|check/i.test(action)?"var(--green2)":"var(--gold2)");
+  return `<div class="fbar">
+    <div class="fbar-row"><span class="fbar-lbl">${action}</span><span class="fbar-pct" style="color:${c}">${pct}%</span></div>
+    <div class="fbar-track"><div class="fbar-fill" style="width:${pct}%;background:${c}"></div></div>
+  </div>`;
+}
+
+function gradeHTML(grade, size){
+  size=size||54;
+  const col=GRADE_COL[grade]||"var(--text3)";
+  return `<div class="grade" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.36)}px;border:2px solid ${col};background:${col}1a;color:${col}">${grade}</div>`;
+}
+
+function spHTML(street){
+  const m={preflop:["#9d7dfa","rgba(157,125,250,.12)"],flop:["var(--green2)","var(--green-dim)"],turn:["var(--gold2)","var(--gold-dim)"],river:["var(--red2)","var(--red-dim)"]};
+  const [c,bg]=m[street]||["var(--text3)","var(--bg3)"];
+  return `<span class="sp" style="background:${bg};color:${c};border:1px solid ${c}33">${street.toUpperCase()}</span>`;
+}
+
+function rfiColorV3(f){
+  if(!f||f<=0) return"#030705";
+  if(f>=90)return"#0d5224";if(f>=70)return"#0f6a2e";
+  if(f>=50)return"#284a0c";if(f>=30)return"#5c3010";
+  if(f>=10)return"#6a2010";return"#321808";
+}
+function bbColorV3(c,r){c=c||0;r=r||0;
+  if(r>=70)return"#0d5224";if(r>=35)return"#0f6a2e";if(r>=10)return"#174a38";
+  if(c>=70)return"#183060";if(c>=40)return"#142450";if(c>=10)return"#101d3c";
+  return"#030705";
+}
+
+function buildGridFn(getColor, getText, C, selObj, idp){
+  C=C||32;
+  let h=`<div class="rg-wrap"><div class="rg-grid">`;
+  h+=`<div class="rg-row"><div class="rg-head-cell" style="width:${C}px;height:${C}px"></div>`;
+  RANKS.forEach(r=>{h+=`<div class="rg-head-cell" style="width:${C}px;height:${C}px">${r}</div>`;});
+  h+=`</div>`;
+  for(let row=0;row<13;row++){
+    h+=`<div class="rg-row"><div class="rg-head-cell" style="width:${C}px;height:${C}px">${RANKS[row]}</div>`;
+    for(let col=0;col<13;col++){
+      const hand=handStr(row,col);
+      const bg=getColor(row,col,hand);
+      const txt=getText(row,col,hand);
+      const isPair=row===col,isSuit=row<col;
+      const txtCol=isPair?"#e8e0cc":isSuit?"#9ccfb8":"#c8b890";
+      const isSel=selObj&&selObj.row===row&&selObj.col===col;
+      h+=`<div class="rg-cell${isSel?" sel":""}" data-row="${row}" data-col="${col}" data-pfx="${idp||''}"
+        style="width:${C-1}px;height:${C-1}px;background:${bg}">
+        <span style="color:${txtCol}">${txt}</span></div>`;
+    }
+    h+=`</div>`;
+  }
+  h+=`</div></div>`;
+  return h;
+}
+
+// ── QUIZ ────────────────────────────────────────────────────────
+function renderQuiz(){
+  const q=S.qQ,res=S.qResult,st=S.qStats;
+  const modeBar=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <div class="pill-group">
+      <div class="pill${S.qMode==="rfi"?" active":""}" onclick="set({qMode:'rfi',qQ:null,qResult:null})">RFI Apertura</div>
+      <div class="pill pill-green${S.qMode==="bb"?" active":""}" onclick="set({qMode:'bb',qQ:null,qResult:null})">BB Defensa</div>
+    </div>
+    ${st.n>0?`<div style="display:flex;gap:10px;align-items:center">
+      ${st.streak>2?`<div class="streak-badge">🔥 ${st.streak}</div>`:""}
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">
+        <span style="color:var(--gold)">${st.correct}</span>/<span>${st.n}</span>
+        <span style="color:var(--text4);margin:0 4px">·</span>
+        <span style="color:${st.correct/st.n>.65?"var(--green2)":st.correct/st.n>.45?"var(--gold2)":"var(--red2)"}">${Math.round(st.correct/st.n*100)}%</span>
+      </div>
+    </div>`:""}
+  </div>
+  <div class="pos-chips">
+    ${S.qMode==="rfi"
+      ?["UTG","HJ","CO","BTN","SB"].map(p=>`<div class="pos-chip${S.qPos===p?" active-gold":""}" onclick="set({qPos:'${p}',qQ:null,qResult:null})">${p}</div>`).join("")
+      :["vs BTN","vs CO"].map(sc=>`<div class="pos-chip${S.qScen===sc?" active-green":""}" onclick="set({qScen:'${sc}',qQ:null,qResult:null})">${sc}</div>`).join("")
+    }
+  </div>`;
+
+  if(!q){
+    return `<div class="page anim-in">
+      <div style="max-width:520px;display:flex;flex-direction:column;gap:14px">
+        ${modeBar}
+        <div style="height:1px;background:var(--border2);margin:8px 0"></div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:22px;padding:40px 0">
+          <div style="font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:600;color:var(--gold);text-align:center;line-height:1.2">
+            Quiz de Rangos GTO
+          </div>
+          <div style="font-size:13px;color:var(--text3);text-align:center;max-width:340px;line-height:1.8">
+            169 manos × posiciones = <span style="color:var(--gold)">+1000 combinaciones únicas.</span><br>
+            Sin IA. Sin internet. Rangos de solver reales.
+          </div>
+          ${st.n>0?`<div style="display:flex;gap:12px">
+            ${Object.entries(st.grades).slice(0,4).map(([g,n])=>{const c=GRADE_COL[g]||"var(--text3)";return `<div class="stat-card"><div class="stat-val" style="color:${c};font-size:18px">${n}</div><div class="stat-lbl">${g}</div></div>`;}).join("")}
+          </div>`:""}
+          <button class="btn-primary" onclick="startQuiz()" style="padding:14px 40px;font-size:14px">
+            ♠ Empezar Quiz
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  let answerBtns="";
+  if(q.mode==="rfi"){
+    answerBtns=`<button class="btn-action btn-call" onclick="answerQuiz('open')" style="min-width:140px">📈 Abrir</button>
+      <button class="btn-action btn-fold" onclick="answerQuiz('fold')" style="min-width:140px">✕ Fold</button>`;
+  }else{
+    answerBtns=`<button class="btn-action btn-raise" onclick="answerQuiz('raise')">⬆ 3-Bet</button>
+      <button class="btn-action btn-call" onclick="answerQuiz('call')">↔ Call</button>
+      <button class="btn-action btn-fold" onclick="answerQuiz('fold')">✕ Fold</button>`;
+  }
+
+  let resultHTML="";
+  if(res){
+    const gc=GRADE_COL[res.grade]||"var(--text3)";
+    const isOk=res.ok;
+    const freqs=q.mode==="rfi"
+      ?[["Abrir",q.freqOpen,"var(--green2)"],["Fold",q.freqFold,"var(--red2)"]]
+      :[["3-Bet",q.freqRaise,"var(--gold2)"],["Call",q.freqCall,"var(--blue)"],["Fold",q.freqFold,"var(--red2)"]];
+    resultHTML=`<div class="panel anim-pop ${isOk?"result-correct":"result-wrong"}" style="max-width:400px;width:100%">
+      <div class="panel-body">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+          ${gradeHTML(res.grade,60)}
+          <div>
+            <div style="font-size:17px;font-weight:600;color:${isOk?"var(--green2)":"var(--red2)"}">${isOk?"✓ Correcto":"✗ Incorrecto"}</div>
+            ${res.note?`<div style="font-size:11px;color:var(--text3);margin-top:4px">${res.note}</div>`:""}
+          </div>
+        </div>
+        <div style="margin-bottom:16px">${freqs.map(([a,p,c])=>fbarHTML(a,p,c)).join("")}</div>
+        <button class="btn-primary" onclick="startQuiz()" style="width:100%;text-align:center">Siguiente →</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="page anim-in" style="display:flex;flex-direction:column;align-items:center;gap:16px">
+    <div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:12px">${modeBar}</div>
+    <div class="quiz-card" style="width:100%;max-width:400px">
+      <div class="slabel">${q.mode==="rfi"?`RFI — ${q.pos}`:`BB vs ${q.scenario}`}</div>
+      <div class="hand-display">${q.hand}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${q.cmbs} combinaciones posibles</div>
+      ${!res?`<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">${answerBtns}</div>`:""}
+    </div>
+    ${resultHTML}
+  </div>`;
+}
+
+// ── SCENARIOS ───────────────────────────────────────────────────
+function renderScenarios(){
+  const pool=getFilteredScenarios();
+  const sc=pool[S.scIdx%pool.length];
+  const res=S.scResult;
+
+  const filters=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+    <div class="pill-group">
+      ${["all","preflop","flop","turn","river"].map(f=>`<div class="pill${S.scFilter===f?" active":""}" onclick="set({scFilter:'${f}',scIdx:0,scResult:null})">${f==="all"?"Todos":f.charAt(0).toUpperCase()+f.slice(1)}</div>`).join("")}
+    </div>
+    <div style="flex:1"></div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text3)">
+      <span style="color:var(--gold)">${(S.scIdx%pool.length)+1}</span> / ${pool.length}
+    </div>
+  </div>`;
+
+  const board=sc.board||[];
+  const boardHTML=board.length?board.map(c=>pcardHTML(c,"sm")).join(""):"";
+
+  let actionBtns="";
+  if(!res){
+    actionBtns=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      ${sc.actions.map(a=>{
+        const isFold=/fold/i.test(a),isCall=/call|check/i.test(a);
+        const cls=isFold?"btn-fold":isCall?"btn-call":"btn-raise";
+        return `<button class="btn-action ${cls}" onclick="answerScenario(decodeURIComponent('${encodeURIComponent(a)}'))">${a}</button>`;
+      }).join("")}
+    </div>`;
+  }
+
+  let resultHTML="";
+  if(res){
+    const gc=GRADE_COL[res.grade]||"var(--text3)";
+    const isGood=["A","A+","B+","B"].includes(res.grade);
+    resultHTML=`<div class="panel anim-up ${isGood?"result-correct":"result-wrong"}">
+      <div class="panel-body">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+          ${gradeHTML(res.grade,50)}
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">
+              Jugaste: <span style="color:${gc}">${res.action}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:3px">GTO óptimo: ${sc.correct}</div>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          ${Object.entries(sc.freqs).map(([a,p])=>{
+            const c=/fold/i.test(a)?"var(--red2)":/call|check/i.test(a)?"var(--green2)":"var(--gold2)";
+            return fbarHTML(a,p,c);
+          }).join("")}
+        </div>
+        <div class="ib ib-gold" style="margin-bottom:10px">
+          <div class="ib-title" style="color:rgba(200,167,74,.7)">ANÁLISIS</div>
+          <div class="ib-body">${sc.explanation}</div>
+        </div>
+        <div class="ib ib-green" style="margin-bottom:16px">
+          <div class="ib-title" style="color:rgba(58,176,107,.7)">LECCIÓN CLAVE</div>
+          <div class="ib-body">${sc.insight}</div>
+        </div>
+        <button class="btn-primary" onclick="nextScenario()">Siguiente Escenario →</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="page anim-in">
+    ${filters}
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:660px">
+      <div class="panel panel-gold">
+        <div class="panel-body">
+          <div class="sc-meta" style="margin-bottom:14px">
+            ${spHTML(sc.street)}
+            <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${sc.pos} vs ${sc.vpos}</span>
+            <span style="flex:1"></span>
+            <span style="font-size:14px;font-weight:700;color:var(--gold);font-family:'IBM Plex Mono',monospace">${sc.handDisplay||"??"}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+            ${sc.cards.map(c=>pcardHTML(c,"md")).join("")}
+            ${board.length?`<div style="width:1px;height:56px;background:var(--border2);margin:0 5px"></div>
+              ${boardHTML}`:""}
+          </div>
+          <div class="sc-situation">${sc.situation}${sc.toCall>0?`<br><span style="color:var(--gold);font-family:'IBM Plex Mono',monospace;font-size:12px;margin-top:4px;display:block">→ Te cuesta ${sc.toCall} BB · Bote: ${sc.pot} BB</span>`:`<div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:6px">Bote: ${sc.pot} BB · Stack: ${sc.stack} BB</div>`}</div>
+          ${actionBtns}
+        </div>
+      </div>
+      ${resultHTML}
+    </div>
+  </div>`;
+}
+
+// ── RANGES ──────────────────────────────────────────────────────
+function renderRanges(){
+  const sel=S.rmSel;
+  function getColor(row,col,h){
+    if(S.rmMode==="rfi") return rfiColorV3(RFI[S.rmPos]?.[h]||0);
+    const d=BB_DEF[S.rmScen]?.[h]||{c:0,r:0};
+    return bbColorV3(d.c||0,d.r||0);
+  }
+  function getText(row,col,h){
+    const p=row===col,s=row<col;
+    return p?h:s?`${RANKS[row]}${RANKS[col]}s`:`${RANKS[col]}${RANKS[row]}o`;
+  }
+  let tc=0;
+  for(let i=0;i<13;i++)for(let j=0;j<13;j++){
+    const h=handStr(i,j);
+    const v=S.rmMode==="rfi"?(RFI[S.rmPos]?.[h]||0)/100:((BB_DEF[S.rmScen]?.[h]?.c||0)+(BB_DEF[S.rmScen]?.[h]?.r||0))/100;
+    tc+=combos(h)*v;
+  }
+
+  let selPanel=`<div style="display:flex;align-items:center;justify-content:center;height:200px">
+    <div style="text-align:center;color:var(--text3)">
+      <div style="font-size:32px;margin-bottom:8px;opacity:.3">↑</div>
+      <div style="font-size:12px;line-height:1.6">Haz clic en cualquier<br>mano para ver el análisis</div>
+    </div>
+  </div>`;
+
+  if(sel){
+    const c=sel.cell;
+    const freqs=c.type==="rfi"
+      ?[["Abrir",c.freq,"var(--green2)"],["Fold",100-c.freq,"var(--red2)"]]
+      :[["3-Bet",c.raise,"var(--gold2)"],["Call",c.call,"var(--blue)"],["Fold",c.fold,"var(--red2)"]];
+    let tip="";
+    if(c.type==="rfi"){
+      if(c.freq>=90) tip=`Apertura al 100% desde ${S.rmPos}. Mano premium, fold es un error grave.`;
+      else if(c.freq>=65) tip=`Apertura frecuente (~${c.freq}%). Parte del rango core de ${S.rmPos}.`;
+      else if(c.freq>=35) tip=`Mano mixta (${c.freq}%). GTO mezcla apertura y fold. No hay respuesta única.`;
+      else if(c.freq>0) tip=`Apertura marginal (${c.freq}%). En rango de balance, no es obligatoria.`;
+      else tip=`Fold desde ${S.rmPos}. No tiene equity suficiente para abrir en esta posición.`;
+    } else {
+      const best=c.raise>=40?"3-bet":c.call>=40?"call":"fold";
+      if(best==="3-bet") tip=`3-bet frecuente (${c.raise}%). Mano fuerte o con buen bloqueador de Ace.`;
+      else if(best==="call") tip=`Defensa principalmente llamando (${c.call}%). Buena playability postflop.`;
+      else tip=`Fold frecuente (${c.fold}%). No alcanza el umbral de defensa ${S.rmScen}.`;
+    }
+    selPanel=`<div class="anim-pop">
+      <div style="display:flex;gap:10px;align-items:baseline;margin-bottom:14px">
+        <span style="font-size:32px;font-weight:700;color:var(--gold);font-family:'IBM Plex Mono',monospace">${c.hand}</span>
+        <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${combos(c.hand)} combos</span>
+      </div>
+      ${freqs.map(([a,p,col])=>fbarHTML(a,p,col)).join("")}
+      <div class="divider"></div>
+      <div class="ib ib-gold">
+        <div class="ib-title" style="color:rgba(200,167,74,.7)">ANÁLISIS GTO</div>
+        <div class="ib-body">${tip}</div>
+      </div>
+    </div>`;
+  }
+
+  const legend=S.rmMode==="rfi"
+    ?[[100,"100%"],[70,"70%"],[50,"50%"],[30,"30%"],[10,"10%"],[0,"Fold"]].map(([f,l])=>`<div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:${rfiColorV3(f)}"></div><span style="font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${l}</span></div>`).join("")
+    :[[0,80,"3-bet"],[0,30,"Mix"],[70,0,"Call"],[30,0,"Call mix"],[0,0,"Fold"]].map(([c,r,l])=>`<div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:${bbColorV3(c,r)}"></div><span style="font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${l}</span></div>`).join("");
+
+  return `<div class="page anim-in">
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div class="pill-group">
+            <div class="pill${S.rmMode==="rfi"?" active":""}" onclick="set({rmMode:'rfi',rmSel:null})">RFI Apertura</div>
+            <div class="pill pill-green${S.rmMode==="bb"?" active":""}" onclick="set({rmMode:'bb',rmSel:null})">BB Defensa</div>
+          </div>
+          <div style="flex:1"></div>
+          <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">
+            <span style="color:var(--gold)">${Math.round(tc)}</span> combos · 
+            <span style="color:var(--gold)">${(tc/1326*100).toFixed(1)}%</span>
+          </span>
+        </div>
+        <div class="pos-chips">
+          ${S.rmMode==="rfi"
+            ?["UTG","HJ","CO","BTN","SB"].map(p=>`<div class="pos-chip${S.rmPos===p?" active-gold":""}" onclick="set({rmPos:'${p}',rmSel:null})">${p}</div>`).join("")
+            :["vs BTN","vs CO"].map(sc=>`<div class="pos-chip${S.rmScen===sc?" active-green":""}" onclick="set({rmScen:'${sc}',rmSel:null})">${sc}</div>`).join("")
+          }
+        </div>
+        ${buildGridFn(getColor,getText,33,S.rmSel,"rm")}
+        <div style="display:flex;gap:10px;flex-wrap:wrap">${legend}</div>
+      </div>
+      <div style="width:260px;flex-shrink:0">
+        <div class="panel panel-gold" style="position:sticky;top:120px">
+          <div class="panel-header">
+            <span class="panel-title" style="font-size:16px">${S.rmMode==="rfi"?`RFI — ${S.rmPos}`:`BB — ${S.rmScen}`}</span>
+          </div>
+          <div class="panel-body">${selPanel}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── ANALYZER ────────────────────────────────────────────────────
+function renderAnalyzer(){
+  const board=S.aBoardCards.filter(Boolean);
+  const heroCards=S.aHeroCards;
+  const hasFlop=board.length>=3;
+  const used=new Set([...heroCards,...board].filter(Boolean));
+  const vilRng=RFI[S.aVilPos]||RFI.BTN;
+  const tex=hasFlop?boardTexture(board.slice(0,3)):null;
+
+  function getColor(row,col,h){
+    const freq=vilRng[h]||0;
+    if(freq===0) return"#020404";
+    if(!hasFlop) return rfiColorV3(freq);
+    const s=handBoardStrength(h,board);
+    return strengthToRangeColor(s,freq>0);
+  }
+  function getText(row,col,h){
+    const p=row===col,s=row<col;
+    return p?h:s?`${RANKS[row]}${RANKS[col]}s`:`${RANKS[col]}${RANKS[row]}o`;
+  }
+
+  let strong=0,made=0,draws=0,air=0,total=0;
+  if(hasFlop){
+    for(let i=0;i<13;i++)for(let j=0;j<13;j++){
+      const h=handStr(i,j),f=vilRng[h]||0;
+      if(f>0){const n=combos(h)*(f/100);total+=n;const s=handBoardStrength(h,board);
+        if(s>=7)strong+=n;else if(s>=5)made+=n;else if(s>=3)draws+=n;else air+=n;}
+    }
+  }
+
+  const boardStreet=board.length===0?"PREFLOP":board.length<3?"INCOMPLETO":board.length===3?"FLOP":board.length===4?"TURN":"RIVER";
+
+  let texHTML="";
+  if(tex){
+    const chips=[];
+    if(tex.isMonotone) chips.push(`<span class="tex-chip tex-mono">MONOTONA</span>`);
+    else if(tex.isTwoTone) chips.push(`<span class="tex-chip tex-wet">DOS COLORES</span>`);
+    else chips.push(`<span class="tex-chip tex-dry">RAINBOW</span>`);
+    if(tex.isConnected) chips.push(`<span class="tex-chip tex-wet">CONECTADA</span>`);
+    if(tex.isPaired) chips.push(`<span class="tex-chip tex-pair">PAREADA</span>`);
+    const wetness=tex.wet>=5?"MUY HÚMEDA":tex.wet>=3?"HÚMEDA":tex.wet>=1?"SEMI-SECA":"SECA";
+    chips.push(`<span class="tex-chip ${tex.wet>=3?"tex-wet":"tex-dry"}">${wetness}</span>`);
+    texHTML=`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">${chips.join("")}</div>`;
+  }
+
+  const modal=S.aPickingSlot!==null?buildPickerModal(used):"";
+
+  return `<div class="page anim-in" style="display:flex;gap:20px;flex-wrap:wrap">
+    <!-- LEFT CONTROLS -->
+    <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:14px">
+      <div class="panel panel-gold">
+        <div class="panel-header"><span class="panel-title">Configurar Mano</span></div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:16px">
+          <div>
+            <div class="slabel">HERO — POSICIÓN</div>
+            <div class="pos-chips">${["UTG","HJ","CO","BTN","SB"].map(p=>`<div class="pos-chip${S.aHeroPos===p?" active-gold":""}" onclick="set({aHeroPos:'${p}'})">${p}</div>`).join("")}</div>
+          </div>
+          <div>
+            <div class="slabel">VILLAIN — POSICIÓN</div>
+            <div class="pos-chips">${["UTG","HJ","CO","BTN","BB"].map(p=>`<div class="pos-chip${S.aVilPos===p?" active-gold":""}" onclick="set({aVilPos:'${p}'})">${p}</div>`).join("")}</div>
+          </div>
+          <div>
+            <div class="slabel">CARTAS DEL HERO</div>
+            <div style="display:flex;gap:8px">${[0,1].map(i=>slotHTML(S.aHeroCards[i],"hero",i,i===0?"A":"B")).join("")}</div>
+          </div>
+          <div>
+            <div class="slabel">TABLERO <span style="color:var(--gold)">${boardStreet}</span></div>
+            <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap">
+              ${[0,1,2].map(i=>slotHTML(S.aBoardCards[i],"board",i,["F","L","O"][i])).join("")}
+              <div style="width:1px;height:40px;background:var(--border2)"></div>
+              ${slotHTML(S.aBoardCards[3],"board",3,"T")}
+              <div style="width:1px;height:40px;background:var(--border2)"></div>
+              ${slotHTML(S.aBoardCards[4],"board",4,"R")}
+            </div>
+            ${texHTML}
+          </div>
+          <button class="btn-ghost" onclick="resetAnalyzer()" style="width:100%">↺ Resetear mano</button>
+        </div>
+      </div>
+      ${hasFlop?`<div class="panel">
+        <div class="panel-header"><span class="panel-title" style="font-size:15px">Distribución del Rango</span></div>
+        <div class="panel-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            ${[["Fuertes",Math.round(strong),"var(--green2)"],["Made",Math.round(made),"#8bc34a"],["Draws",Math.round(draws),"var(--gold2)"],["Air",Math.round(air),"var(--red2)"]].map(([l,v,c])=>`<div class="stat-card"><div class="stat-val" style="color:${c};font-size:18px">${v}</div><div class="stat-lbl">${l}</div></div>`).join("")}
+          </div>
+          ${total>0?`<div style="height:6px;border-radius:3px;overflow:hidden;display:flex;margin-bottom:8px">
+            <div style="width:${strong/total*100}%;background:var(--green2)"></div>
+            <div style="width:${made/total*100}%;background:#8bc34a"></div>
+            <div style="width:${draws/total*100}%;background:var(--gold2)"></div>
+            <div style="width:${air/total*100}%;background:var(--red2)"></div>
+          </div>
+          <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace">
+            ${Math.round((strong+made)/total*100)}% con mano hecha · ${Math.round(draws/total*100)}% con draw
+          </div>`:""}
+        </div>
+      </div>`:""}
+    </div>
+    <!-- RANGE GRID -->
+    <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--gold)">Rango del Villain <span style="color:var(--text3);font-size:16px">(${S.aVilPos})</span></div>
+        ${hasFlop?`<span style="font-size:12px;color:var(--green2);font-family:'IBM Plex Mono',monospace">${Math.round((strong+made+draws)/total*100)}% continúa</span>`:""}
+      </div>
+      <div class="ib ib-gold" style="font-size:12px">
+        ${!hasFlop
+          ? `Mostrando rango de apertura de <strong style="color:var(--gold)">${S.aVilPos}</strong>. Agrega el flop para ver la interacción con el tablero.`
+          : `Rango de <strong style="color:var(--gold)">${S.aVilPos}</strong> sobre tablero <strong style="color:var(--gold)">${board.join(" ")}</strong>`
+        }
+      </div>
+      ${buildGridFn(getColor,getText,32,null,"an")}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${hasFlop
+          ?[["#0d5224","Sets/Quads"],["#0f6a2e","TPTK"],["#174a38","Par medio"],["#284a0c","Draw"],["#5c3010","Backdoor"],["#020404","Air"]].map(([c,l])=>`<div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:${c}"></div><span style="font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${l}</span></div>`).join("")
+          :[[90,"100%"],[70,"70%"],[50,"50%"],[30,"30%"],[10,"10%"],[0,"Fold"]].map(([f,l])=>`<div style="display:flex;align-items:center;gap:5px"><div class="legend-dot" style="background:${rfiColorV3(f)}"></div><span style="font-size:9px;color:var(--text3);font-family:'IBM Plex Mono',monospace">${l}</span></div>`).join("")
+        }
+      </div>
+    </div>
+  </div>${modal}`;
+}
+
+// ── EV CALCULATOR ────────────────────────────────────────────────
+function renderEV(){
+  const ev=S.ev||{pot:10,bet:5,equity:45,foldEq:35};
+
+  const potBB=parseFloat(ev.pot)||10;
+  const betBB=parseFloat(ev.bet)||5;
+  const equity=(parseFloat(ev.equity)||45)/100;
+  const foldEq=(parseFloat(ev.foldEq)||35)/100;
+
+  // EV of bet
+  const callFreq=1-foldEq;
+  const evBet=foldEq*potBB + callFreq*(equity*(potBB+betBB) - (1-equity)*betBB);
+  // EV of check (simplified: equity * pot, no more betting)
+  const evCheck=equity*potBB;
+  const evDiff=evBet-evCheck;
+
+  // Break-even fold %
+  // evBet>0: foldEq*pot + callFreq*(eq*(pot+bet)-(1-eq)*bet) > 0
+  const breakEvenFold=(betBB - equity*(potBB+betBB)) / (potBB - equity*(potBB+betBB) + (1-equity)*betBB);
+  const beFoldPct=Math.max(0,Math.min(100,breakEvenFold*100));
+
+  // Minimum equity when called to break even vs fold
+  // evBet=evCheck when: foldEq*pot + callFreq*(eq*(pot+bet)-(1-eq)*bet) = eq*pot
+  // Solving: minimum equity needed for bet to be +EV vs checking
+  const minEq=(foldEq*potBB) / (callFreq*(potBB+2*betBB));
+  const minEqPct=Math.max(0,Math.min(100,minEq*100));
+
+  // Pot odds
+  const potOdds=betBB/(potBB+betBB);
+  const breakEvenEq=potOdds*100;
+
+  // SPR
+  const stack=parseFloat(ev.stack)||100;
+  const spr=stack/(potBB);
+
+  const evColor=evBet>evCheck?"var(--green2)":"var(--red2)";
+  const diffColor=evDiff>0?"var(--green2)":"var(--red2)";
+  const diffSign=evDiff>0?"+":"";
+
+  function numInput(key,label,val,min,max,step,unit){
+    return `<div class="ev-input-group">
+      <div class="ev-label">${label} ${unit?`<span style="color:var(--gold);font-size:10px">${unit}</span>`:""}</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <input class="ev-input" type="number" min="${min}" max="${max}" step="${step}" value="${val}"
+          oninput="setEV('${key}',this.value)" style="width:90px">
+        <input class="ev-slider" type="range" min="${min}" max="${max}" step="${step}" value="${val}"
+          oninput="setEV('${key}',this.value)">
+      </div>
+    </div>`;
+  }
+
+  return `<div class="page anim-in">
+    <div style="display:flex;gap:20px;flex-wrap:wrap">
+      <!-- INPUTS -->
+      <div style="width:300px;flex-shrink:0">
+        <div class="panel panel-gold">
+          <div class="panel-header"><span class="panel-title">Parámetros</span></div>
+          <div class="panel-body" style="display:flex;flex-direction:column;gap:4px">
+            ${numInput("pot","Tamaño del Bote",potBB,0.5,200,0.5,"BB")}
+            ${numInput("bet","Tamaño de la Apuesta",betBB,0.5,150,0.5,"BB")}
+            ${numInput("equity","Equity cuando llaman",Math.round(equity*100),0,100,1,"%")}
+            ${numInput("foldEq","Fold Equity (villano foldea)",Math.round(foldEq*100),0,100,1,"%")}
+            ${numInput("stack","Stack efectivo",stack,1,300,1,"BB")}
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:14px">
+        <!-- Main result -->
+        <div class="panel panel-gold">
+          <div class="panel-header"><span class="panel-title">Decisión Óptima</span></div>
+          <div class="panel-body">
+            <div style="text-align:center;padding:14px 0 18px;border-bottom:1px solid var(--border2);margin-bottom:18px">
+              <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;color:var(--text3);margin-bottom:8px">
+                ${evBet>evCheck?"APOSTAR es +EV":"APOSTAR no es +EV vs checkear"}
+              </div>
+              <div class="ev-result-val" style="color:${evColor}">${diffSign}${evDiff.toFixed(2)} BB</div>
+              <div class="ev-result-lbl">diferencia EV (apostar vs checkear)</div>
+            </div>
+
+            <div class="ev-compare">
+              <div class="ev-comp-card">
+                <div class="ev-comp-val" style="color:${evBet>0?"var(--green2)":"var(--red2)"}">${evBet.toFixed(2)}</div>
+                <div class="ev-comp-lbl">EV Apostar</div>
+              </div>
+              <div class="ev-comp-card">
+                <div class="ev-comp-val" style="color:var(--blue)">${evCheck.toFixed(2)}</div>
+                <div class="ev-comp-lbl">EV Checkear</div>
+              </div>
+            </div>
+
+            <div class="ev-breakdown">
+              ${[
+                ["Pot odds para villain",`${breakEvenEq.toFixed(1)}%`,"necesita para llamar"],
+                ["Break-even fold equity",`${beFoldPct.toFixed(1)}%`,"mínimo para apuesta +EV"],
+                ["Equity mínima al cobro",`${minEqPct.toFixed(1)}%`,"al ser llamado"],
+                ["Bet/Pot ratio",`${(betBB/potBB*100).toFixed(0)}%`,"tamaño relativo"],
+                ["SPR",spr.toFixed(1),"stack-to-pot ratio"],
+              ].map(([l,v,sub])=>`<div class="ev-breakdown-row">
+                <div>
+                  <div class="ev-breakdown-lbl">${l}</div>
+                  <div style="font-size:9px;color:var(--text4);font-family:'IBM Plex Mono',monospace">${sub}</div>
+                </div>
+                <div class="ev-breakdown-val" style="color:var(--gold)">${v}</div>
+              </div>`).join("")}
+            </div>
+          </div>
+        </div>
+
+        <!-- Breakdown -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title" style="font-size:15px">Desglose del EV</span></div>
+          <div class="panel-body">
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+              ${[
+                [`Gana al fold (${Math.round(foldEq*100)}%)`, (foldEq*potBB), "var(--green2)"],
+                [`Gana al ser llamado`, (callFreq*equity*(potBB+betBB)), "var(--gold2)"],
+                [`Pierde al ser llamado`, -(callFreq*(1-equity)*betBB), "var(--red2)"],
+              ].map(([l,v,c])=>{
+                const pct=Math.abs(v)/Math.max(Math.abs(evBet)+.1,1)*100;
+                return `<div>
+                  <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px;font-family:'IBM Plex Mono',monospace">
+                    <span style="color:var(--text3)">${l}</span>
+                    <span style="color:${c};font-weight:600">${v>0?"+":""}${v.toFixed(2)} BB</span>
+                  </div>
+                  <div style="height:4px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden">
+                    <div style="width:${Math.min(pct,100)}%;height:100%;background:${c};border-radius:2px;transition:width .5s"></div>
+                  </div>
+                </div>`;
+              }).join("")}
+            </div>
+            <div class="ib ib-gold">
+              <div class="ib-title" style="color:rgba(200,167,74,.7)">INTERPRETACIÓN</div>
+              <div class="ib-body" style="font-size:12px">
+                ${evBet>evCheck
+                  ?`Apostar ${betBB} BB en un bote de ${potBB} BB es <strong style="color:var(--green2)">correcto</strong>. Con ${Math.round(foldEq*100)}% de fold equity y ${Math.round(equity*100)}% de equity al cobro, ganás ${evDiff.toFixed(2)} BB extra vs checkear.`
+                  :`Apostar no es óptimo en esta situación. El villain necesita foldear al menos <strong style="color:var(--gold)">${beFoldPct.toFixed(1)}%</strong> para que la apuesta sea +EV vs checkear.`
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildPickerModal(usedCards){
+  const suitColors={s:"#e8e0cc",h:"#d95f5f",d:"#d95f5f",c:"#7ec8a0"};
+  const suitSyms={s:"♠",h:"♥",d:"♦",c:"♣"};
+  let rows="";
+  for(const suit of ["s","h","d","c"]){
+    for(const rank of RANKS){
+      const card=rank+suit;
+      const isUsed=usedCards.has(card);
+      rows+=`<div class="cp-cell ${isUsed?"used":""}"
+        style="color:${suitColors[suit]}"
+        onclick="${isUsed?"":"pickCard('"+card+"')"}">${rank}<br>${suitSyms[suit]}</div>`;
+    }
+  }
+  return `<div class="overlay" onclick="closePicker()">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-title">♠ Seleccioná una carta</div>
+      <div class="cp-grid">${rows}</div>
+      <button class="btn-ghost" onclick="closePicker()" style="width:100%;text-align:center">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+// ── PAGE ROUTER ──────────────────────────────────────────────────
+function renderPage(){
+  let html="";
+  switch(S.tab){
+    case"quiz":      html=renderQuiz();      break;
+    case"scenarios": html=renderScenarios(); break;
+    case"ranges":    html=renderRanges();    break;
+    case"analyzer":  html=renderAnalyzer();  break;
+    case"ev":        html=renderEV();        break;
+  }
+  document.getElementById("page").innerHTML=html;
+  bindEvents2();
+}
+
+function bindEvents2(){
+  document.querySelectorAll(".rg-cell").forEach(cell=>{
+    cell.addEventListener("click",()=>{
+      const row=parseInt(cell.dataset.row),col=parseInt(cell.dataset.col),pfx=cell.dataset.pfx;
+      const h=handStr(row,col);
+      if(pfx==="rm"){
+        let c;
+        if(S.rmMode==="rfi") c={hand:h,freq:RFI[S.rmPos]?.[h]||0,type:"rfi"};
+        else{const d=BB_DEF[S.rmScen]?.[h]||{c:0,r:0};c={hand:h,call:d.c||0,raise:d.r||0,fold:100-(d.c||0)-(d.r||0),type:"bb"};}
+        set({rmSel:{row,col,cell:c}});
+      }
+    });
+  });
+}
+
+// Override the old render() to use renderPage()
+function render(){renderPage();}
+
+// EV state
+S.ev={pot:10,bet:5,equity:45,foldEq:35,stack:100};
+function setEV(key,val){S.ev=Object.assign({},S.ev,{[key]:parseFloat(val)||0});renderPage();}
+
+// Init
 render();
 </script>
 </body>
